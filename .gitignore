@@ -1,0 +1,33 @@
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# Arquivos gerados automaticamente de projeto e solução
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Arquivos meta gerados pela Unity
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Relatórios de erro da Unity
+sysinfo.txt
