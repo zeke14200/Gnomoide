@@ -1,8 +1,8 @@
 public abstract class EstadoInimigoBase
 {
-    protected IAInimigo ia; 
+    protected IAInimigoHibrida ia; 
 
-    public EstadoInimigoBase(IAInimigo ia)
+    public EstadoInimigoBase(IAInimigoHibrida ia)
     {
         this.ia = ia;
     }
