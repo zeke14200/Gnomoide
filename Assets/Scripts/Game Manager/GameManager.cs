@@ -4,7 +4,7 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instancia { get; private set; }
 
-    [Header("Status da Sala (Apenas Leitura)")]
+    [Header("Status da Sala")]
     public int totalMoedas;
     public int moedasColetadas;
     public bool allCoinsCollected;
@@ -36,12 +36,12 @@ public class GameManager : MonoBehaviour
     {
         moedasColetadas++;
         
-        Debug.Log($"[GameManager] Moeda coletada! Faltam {moedasRestantes}.");
+        Debug.Log($"Moeda coletada! Faltam {moedasRestantes}.");
 
         if (moedasColetadas >= totalMoedas)
         {
             allCoinsCollected = true;
-            Debug.Log("[GameManager] TODAS AS MOEDAS COLETADAS! Retorne ao ponto inicial.");
+            Debug.Log("TODAS AS MOEDAS COLETADAS!");
         }
     }
 }
