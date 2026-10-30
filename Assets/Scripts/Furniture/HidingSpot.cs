@@ -6,28 +6,27 @@ public class HidingSpot : MonoBehaviour
     [Header("Configurações do Esconderijo")]
     public bool permiteEsconderijo = true;
     
-    [Tooltip("Arraste para cá os Colliders sólidos (que agora estão nos GameObjects filhos)")]
+    [Tooltip("Pode deixar vazio! O script agora encontra as paredes sólidas sozinho.")]
     public Collider[] colisoresSolidos;
 
     private Rigidbody rb;
-    private int camadaIntangivel;
-    private int[] camadasOriginais;
+    private bool jogadorEstaDentro = false;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         
-        // Busca o ID numérico da Layer que criamos no Editor
-        camadaIntangivel = LayerMask.NameToLayer("MovelIntangivel");
-
-        // Salva a Layer original de cada pedaço da parede para poder devolver depois
-        camadasOriginais = new int[colisoresSolidos.Length];
-        for (int i = 0; i < colisoresSolidos.Length; i++)
+        // Automação inteligente: Acha todas as paredes sólidas do móvel sozinho
+        // Assim você não precisa ficar arrastando colisores no Inspector toda hora
+        if (colisoresSolidos == null || colisoresSolidos.Length == 0)
         {
-            if (colisoresSolidos[i] != null)
+            Collider[] todos = GetComponentsInChildren<Collider>();
+            System.Collections.Generic.List<Collider> solidos = new System.Collections.Generic.List<Collider>();
+            foreach (Collider col in todos)
             {
-                camadasOriginais[i] = colisoresSolidos[i].gameObject.layer;
+                if (!col.isTrigger) solidos.Add(col); // O que não for Trigger é parede!
             }
+            colisoresSolidos = solidos.ToArray();
         }
     }
 
@@ -42,14 +41,16 @@ public class HidingSpot : MonoBehaviour
 
             if (pm != null && ph != null)
             {
+                // A mágica: Se segurar Shift OU já estiver escondido (soltou o Shift lá dentro)
                 if (pm.isCrouching || ph.isHidden)
                 {
-                    // Transforma as paredes na layer "MovelIntangivel"
-                    TornarIntangivel(true);
-                    
-                    if (!ph.isHidden)
+                    // Essa trava garante que ele só execute a rotina de entrar uma única vez
+                    if (!jogadorEstaDentro)
                     {
-                        ph.EntrarEsconderijo();
+                        jogadorEstaDentro = true;
+                        TornarIntangivel(true);
+                        
+                        if (!ph.isHidden) ph.EntrarEsconderijo();
                     }
                 }
             }
@@ -64,12 +65,11 @@ public class HidingSpot : MonoBehaviour
 
             if (ph != null)
             {
-                if (ph.isHidden)
-                {
-                    ph.SairEsconderijo();
-                }
+                // O jogador saiu fisicamente da zona do Trigger
+                jogadorEstaDentro = false;
                 
-                // Devolve as paredes para a Layer original (ex: Default)
+                if (ph.isHidden) ph.SairEsconderijo();
+                
                 TornarIntangivel(false);
             }
         }
@@ -77,18 +77,16 @@ public class HidingSpot : MonoBehaviour
 
     private void TornarIntangivel(bool intangivel)
     {
-        if (camadaIntangivel == -1)
-        {
-            Debug.LogError("ERRO: A Layer 'MovelIntangivel' não existe! Crie ela na Unity.");
-            return;
-        }
+        // O Pulo do Gato: Para o móvel não cair no infinito sem a colisão sólida, 
+        // nós congelamos a física dele temporariamente (isKinematic)
+        if (rb != null) rb.isKinematic = intangivel;
 
-        for (int i = 0; i < colisoresSolidos.Length; i++)
+        // Desliga ou liga as paredes de vez para o CharacterController poder passar liso
+        foreach (Collider solido in colisoresSolidos)
         {
-            if (colisoresSolidos[i] != null)
+            if (solido != null)
             {
-                // Se for pra ficar intangível, aplica a layer fantasma. Se não, restaura a original.
-                colisoresSolidos[i].gameObject.layer = intangivel ? camadaIntangivel : camadasOriginais[i];
+                solido.enabled = !intangivel; 
             }
         }
     }
