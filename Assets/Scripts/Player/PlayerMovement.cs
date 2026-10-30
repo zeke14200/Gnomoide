@@ -30,7 +30,10 @@ public class PlayerMovement : MonoBehaviour
     private bool isGrounded;
 
     private float currentSpeed; 
-    private bool isCrouching;
+    
+    // Variável pública para o HidingSpot saber que o Shift está sendo pressionado
+    public bool isCrouching { get; private set; }
+    
     private bool isLongJumping;
     private bool isDiving;
 
@@ -134,7 +137,6 @@ public class PlayerMovement : MonoBehaviour
             {
                 isDiving = true;
                 isLongJumping = false; 
-                
                 velocity.y = 3f; 
                 airMomentum = transform.forward * Mathf.Max(diveBoost, currentSpeed * 1.2f); 
             }
@@ -167,14 +169,13 @@ public class PlayerMovement : MonoBehaviour
 
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
+        // Sistema de Física de Derrubar Móveis (Preservado)
         FurniturePhysics furniture = hit.collider.GetComponent<FurniturePhysics>();
-        
         if (furniture != null)
         {
             if (hit.normal.y > 0.5f) return;
 
             bool isSpecialMove = isLongJumping || isDiving;
-
             float impactForce = isSpecialMove ? airMomentum.magnitude : currentSpeed;
             Vector3 impactDirection = isSpecialMove ? airMomentum.normalized : transform.forward;
 

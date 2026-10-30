@@ -24,10 +24,7 @@ public class IAInimigoHibrida : MonoBehaviour
     public string estadoAtual = "";
     public string taticaAtual = "";
 
-    // A Máquina de Estados 
     private FSM fsm;
-
-    // As Árvores de Comportamento 
     private BTNode arvorePatrulha;
     private BTNode arvorePerseguicao;
     private BTNode arvorePerseguicaoUnida;
@@ -35,14 +32,15 @@ public class IAInimigoHibrida : MonoBehaviour
     private int indicePatrulha = 0;
     private Collider[] bufferAliados = new Collider[10];
 
+    // Referência crucial ao Stealth do jogador
+    private PlayerHiding estadoStealth;
+
     void Start()
     {
         if (agente == null) agente = GetComponent<NavMeshAgent>();
+        if (jogador != null) estadoStealth = jogador.GetComponent<PlayerHiding>();
 
-        // Constrói as Árvores de Comportamento 
         ConstruirArvoresDeComportamento();
-
-        // Constrói a Máquina de Estados 
         ConstruirMaquinaDeEstados();
     }
 
@@ -52,13 +50,11 @@ public class IAInimigoHibrida : MonoBehaviour
         fsm?.Tick();
     }
 
-    // --- SISTEMA DE LOGS ANTI-SPAM ---
     private void LogEstado(string novoEstado)
     {
         if (estadoAtual != novoEstado)
         {
             estadoAtual = novoEstado;
-            // Usa formatação Rich Text para colorir o Console da Unity
             Debug.Log($"<color=cyan><b>[FSM]</b></color> {gameObject.name} mudou para o Estado: <b>{estadoAtual}</b>");
         }
     }
@@ -74,7 +70,6 @@ public class IAInimigoHibrida : MonoBehaviour
 
     private void ConstruirArvoresDeComportamento()
     {
-        // --- ÁRVORE DE PATRULHA ---
         arvorePatrulha = new BTAction("AndarPelosPontos", () =>
         {
             if (pontosPatrulha.Length == 0) return BTStatus.Failure;
@@ -91,34 +86,26 @@ public class IAInimigoHibrida : MonoBehaviour
             return BTStatus.Running;
         });
 
-        // --- ÁRVORE DE PERSEGUIÇÃO SOZINHO ---
         arvorePerseguicao = new BTAction("CorrerAtrasDoJogador", () =>
         {
             agente.speed = 5f;
             agente.stoppingDistance = 1.5f;
             agente.SetDestination(jogador.position);
-            
             return BTStatus.Running;
         });
 
-        // --- ÁRVORE DE PERSEGUIÇÃO UNIDA ---
         arvorePerseguicaoUnida = new BTSelector("TaticasDeGrupo",
-            
-            // Tática 1: Frenética 
             new BTSequence("TaticaFrenetica",
                 new BTCondition("MuitosAliados", () => AliadosProximos >= 6),
                 new BTAction("EsmagarJogador", () =>
                 {
                     LogTatica("Frenética (Enxame)");
-
                     agente.speed = 8f;
                     agente.stoppingDistance = 0f;
                     agente.SetDestination(jogador.position);
                     return BTStatus.Running;
                 })
             ),
-
-            // Tática 2: Mista (Agrupamento Triplo)
             new BTSequence("TaticaMista",
                 new BTCondition("AliadosMedianos", () => AliadosProximos >= 3),
                 new BTAction("AtaqueMistoTriplo", () =>
@@ -148,12 +135,9 @@ public class IAInimigoHibrida : MonoBehaviour
                         Vector3 pontoCostas = jogador.position - (jogador.forward * 4f);
                         agente.SetDestination(pontoCostas);
                     }
-                    
                     return BTStatus.Running;
                 })
             ),
-
-            // Tática 3: Emboscada (Fallback para 2 aliados)
             new BTAction("TaticaEmboscada", () =>
             {
                 float distanciaAtual = Vector3.Distance(transform.position, jogador.position);
@@ -173,7 +157,6 @@ public class IAInimigoHibrida : MonoBehaviour
                     Vector3 direcaoAfastamento = (transform.position - jogador.position).normalized;
                     agente.SetDestination(jogador.position + (direcaoAfastamento * 3f));
                 }
-                
                 return BTStatus.Running;
             })
         );
@@ -181,7 +164,6 @@ public class IAInimigoHibrida : MonoBehaviour
 
     private void ConstruirMaquinaDeEstados()
     {
-        // Ao usar o onEnter, nós garantimos que o log da máquina de estados dispare apenas UMA vez na transição
         var estadoPatrulha = new FSMDelegateState("Estado_Patrulha",
             onEnter: () => { LogEstado("Patrulha"); LogTatica("Nenhuma (Aguardando)"); },
             onUpdate: () => arvorePatrulha.Tick()
@@ -211,14 +193,15 @@ public class IAInimigoHibrida : MonoBehaviour
         fsm.Start(estadoPatrulha);
     }
 
-    // --- FUNÇÕES DE SENSOR E RADAR ---
     private bool VeJogador()
     {
+        if (estadoStealth != null && estadoStealth.isHidden) return false;
         return (transform.position - jogador.position).sqrMagnitude <= (raioVisao * raioVisao);
     }
 
     private bool PerdeuJogador()
     {
+        if (estadoStealth != null && estadoStealth.isHidden) return true;
         return (transform.position - jogador.position).sqrMagnitude > (raioPerdaDeVisao * raioPerdaDeVisao);
     }
 
