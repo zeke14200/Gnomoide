@@ -1,30 +1,46 @@
 using UnityEngine;
+using System.Collections.Generic;
 
-[RequireComponent(typeof(Collider))]
 public class HidingSpot : MonoBehaviour
 {
     [Header("Configurações do Esconderijo")]
     public bool permiteEsconderijo = true;
     
-    [Tooltip("Pode deixar vazio! O script agora encontra as paredes sólidas sozinho.")]
+    [Tooltip("Distância extra que o jogador deve se afastar para a parede voltar a existir.")]
+    public float margemDeSaida = 0.5f;
+
+    [Tooltip("Deixe vazio! O script encontra as paredes sólidas sozinho.")]
     public Collider[] colisoresSolidos;
 
     private Rigidbody rb;
+    private Collider triggerDetecao;
     private bool jogadorEstaDentro = false;
+
+    private Transform transformJogador;
+    private PlayerHiding scriptHidingDoJogador;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        
-        // Automação inteligente: Acha todas as paredes sólidas do móvel sozinho
-        // Assim você não precisa ficar arrastando colisores no Inspector toda hora
+
+        // Encontra o Trigger (A zona de detecção gordinha que DEVE ter 'Is Trigger' marcado no Inspector)
+        Collider[] todosMeusColliders = GetComponents<Collider>();
+        foreach (Collider col in todosMeusColliders)
+        {
+            if (col.isTrigger) 
+            {
+                triggerDetecao = col;
+                break;
+            }
+        }
+
+        // Encontra a parede de concreto (o BoxCollider que NÃO é Trigger)
         if (colisoresSolidos == null || colisoresSolidos.Length == 0)
         {
-            Collider[] todos = GetComponentsInChildren<Collider>();
-            System.Collections.Generic.List<Collider> solidos = new System.Collections.Generic.List<Collider>();
-            foreach (Collider col in todos)
+            List<Collider> solidos = new List<Collider>();
+            foreach (Collider col in todosMeusColliders)
             {
-                if (!col.isTrigger) solidos.Add(col); // O que não for Trigger é parede!
+                if (!col.isTrigger) solidos.Add(col);
             }
             colisoresSolidos = solidos.ToArray();
         }
@@ -34,59 +50,76 @@ public class HidingSpot : MonoBehaviour
     {
         if (!permiteEsconderijo || !EstaEstavel()) return;
 
+        // Ignora colisores que sejam apenas Triggers (ex: radares da IA)
+        if (other.isTrigger) return;
+
         if (other.CompareTag("Player"))
         {
-            PlayerMovement pm = other.GetComponent<PlayerMovement>();
-            PlayerHiding ph = other.GetComponent<PlayerHiding>();
+            if (jogadorEstaDentro) return;
 
-            if (pm != null && ph != null)
+            PlayerMovement pm = other.GetComponent<PlayerMovement>();
+            
+            // A entrada EXIGE o Shift
+            if (pm != null && pm.isCrouching)
             {
-                // A mágica: Se segurar Shift OU já estiver escondido (soltou o Shift lá dentro)
-                if (pm.isCrouching || ph.isHidden)
+                jogadorEstaDentro = true;
+                
+                transformJogador = other.transform;
+                scriptHidingDoJogador = other.GetComponent<PlayerHiding>();
+
+                // MÁGICA DA INTANGIBILIDADE ABSOLUTA: Desliga a parede e congela a gravidade!
+                TornarIntangivel(true);
+                
+                if (scriptHidingDoJogador != null && !scriptHidingDoJogador.isHidden)
                 {
-                    // Essa trava garante que ele só execute a rotina de entrar uma única vez
-                    if (!jogadorEstaDentro)
-                    {
-                        jogadorEstaDentro = true;
-                        TornarIntangivel(true);
-                        
-                        if (!ph.isHidden) ph.EntrarEsconderijo();
-                    }
+                    scriptHidingDoJogador.EntrarEsconderijo();
                 }
             }
         }
     }
 
-    private void OnTriggerExit(Collider other)
+    void Update()
     {
-        if (other.CompareTag("Player"))
+        if (jogadorEstaDentro && transformJogador != null && triggerDetecao != null)
         {
-            PlayerHiding ph = other.GetComponent<PlayerHiding>();
+            Vector3 bordaDoMovel = triggerDetecao.ClosestPoint(transformJogador.position);
+            float distanciaParaFora = Vector3.Distance(transformJogador.position, bordaDoMovel);
 
-            if (ph != null)
+            // O esconderijo SÓ É CANCELADO quando o jogador estiver totalmente fora da bolha do móvel
+            if (distanciaParaFora > margemDeSaida)
             {
-                // O jogador saiu fisicamente da zona do Trigger
-                jogadorEstaDentro = false;
-                
-                if (ph.isHidden) ph.SairEsconderijo();
-                
-                TornarIntangivel(false);
+                SairDoEsconderijo();
             }
         }
     }
 
+    private void SairDoEsconderijo()
+    {
+        jogadorEstaDentro = false;
+        
+        if (scriptHidingDoJogador != null && scriptHidingDoJogador.isHidden)
+        {
+            scriptHidingDoJogador.SairEsconderijo();
+        }
+        
+        // Devolve a parede e a gravidade
+        TornarIntangivel(false);
+
+        transformJogador = null;
+        scriptHidingDoJogador = null;
+    }
+
     private void TornarIntangivel(bool intangivel)
     {
-        // O Pulo do Gato: Para o móvel não cair no infinito sem a colisão sólida, 
-        // nós congelamos a física dele temporariamente (isKinematic)
+        // 1. Congela o móvel no ar. Ele não vai cair no void porque está imune à gravidade.
         if (rb != null) rb.isKinematic = intangivel;
 
-        // Desliga ou liga as paredes de vez para o CharacterController poder passar liso
-        foreach (Collider solido in colisoresSolidos)
+        // 2. Desliga a parede física completamente. É IMPOSSÍVEL o CharacterController bater nela agora.
+        for (int i = 0; i < colisoresSolidos.Length; i++)
         {
-            if (solido != null)
+            if (colisoresSolidos[i] != null)
             {
-                solido.enabled = !intangivel; 
+                colisoresSolidos[i].enabled = !intangivel;
             }
         }
     }

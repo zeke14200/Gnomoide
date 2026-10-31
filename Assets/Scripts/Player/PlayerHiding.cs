@@ -9,13 +9,11 @@ public class PlayerHiding : MonoBehaviour
 
     public bool isHidden { get; private set; }
 
-    // Gerenciamento de Materiais
     private Renderer[] renderizadoresVisuais;
     private Dictionary<Renderer, Material[]> materiaisOriginais = new Dictionary<Renderer, Material[]>();
 
     void Awake()
     {
-        // Captura todas as malhas visuais do jogador (corpo, roupas, etc)
         renderizadoresVisuais = GetComponentsInChildren<Renderer>();
         foreach (var rend in renderizadoresVisuais)
         {
@@ -28,7 +26,6 @@ public class PlayerHiding : MonoBehaviour
         if (isHidden) return;
         isHidden = true;
 
-        // Aplica o efeito visual de Outline (deixando o interior invisível)
         foreach (var rend in renderizadoresVisuais)
         {
             Material[] matsOutline = new Material[rend.materials.Length];
@@ -47,7 +44,6 @@ public class PlayerHiding : MonoBehaviour
         if (!isHidden) return;
         isHidden = false;
 
-        // Devolve as cores e texturas originais ao personagem
         foreach (var rend in renderizadoresVisuais)
         {
             if (materiaisOriginais.ContainsKey(rend))

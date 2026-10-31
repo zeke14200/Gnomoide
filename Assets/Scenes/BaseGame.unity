@@ -343,6 +343,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Base Wolrf
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 06b7a6e3ba472b24c8ea4dcca7a09ebf, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -483,6 +487,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Tenis Allstar
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 761ebf291e2c949419aca0b1786c6311, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -560,6 +568,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: ed7fa90c193444a47b5958311d5449f2, type: 3}
       propertyPath: m_Name
       value: Base Demon
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: ed7fa90c193444a47b5958311d5449f2, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1195,6 +1207,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Caixa Baixo
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 6ae556636f20cac4d85b8992ad4b04cc, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1390,7 +1406,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 820442627}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Modelos
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1730,6 +1746,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Estante
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: cf87e200704a4824f99ddabeedf60a2a, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1982,6 +2002,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Action Figure Shark
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 0c2234cc6f4e20142a2d599821ec4207, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2003,7 +2027,7 @@ GameObject:
   - component: {fileID: 1162247706}
   - component: {fileID: 1162247708}
   - component: {fileID: 1162247707}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Player Place Holder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2271,7 +2295,7 @@ GameObject:
   - component: {fileID: 1260469661}
   - component: {fileID: 1260469668}
   - component: {fileID: 1260469669}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Player
   m_TagString: Player
   m_Icon: {fileID: 0}
@@ -2483,6 +2507,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 8a5f79bb7a3dd7e4d99cf2b55549f8b3, type: 3}
       propertyPath: m_Name
       value: Caixa Cima
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 8a5f79bb7a3dd7e4d99cf2b55549f8b3, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2882,6 +2910,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Action Figure Demon
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 0ed52f2b09c206647942966435ead6e9, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3100,6 +3132,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 4678e151dac1a2840b372e4055658bbd, type: 3}
       propertyPath: m_Name
       value: Action FIgure Wolf
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4678e151dac1a2840b372e4055658bbd, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3382,6 +3418,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Base Shark
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4b6edbb7b38137d4c9fdd7930f47aab8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3633,7 +3673,7 @@ GameObject:
   - component: {fileID: 1949341204}
   - component: {fileID: 1949341206}
   - component: {fileID: 1949341207}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Estante
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3690,8 +3730,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FurniturePhysics
   canBeKnockedOver: 1
-  resistanceThreshold: 5
-  impactMultiplier: 2
+  resistanceThreshold: 15
+  impactMultiplier: 5
 --- !u!54 &1949341205
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -3732,6 +3772,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HidingSpot
   permiteEsconderijo: 1
+  margemDeSaida: 0.5
+  nomeLayerIntangivel: MovelIntangivel
   colisoresSolidos:
   - {fileID: 1949341203}
 --- !u!65 &1949341207
