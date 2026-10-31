@@ -1,10 +1,9 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; 
 
 [RequireComponent(typeof(Collider))]
 public class StartPoint : MonoBehaviour
 {
-    private bool estaReiniciando = false;
+    private bool aguardandoSaidaDoJogador = true;
 
     void Start()
     {
@@ -13,27 +12,28 @@ public class StartPoint : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (estaReiniciando) return;
+        // Evita que o round passe instantaneamente no exato frame em que o jogador for teleportado para cá
+        if (aguardandoSaidaDoJogador) return;
 
         if (other.CompareTag("Player"))
         {
             if (GameManager.Instancia != null && GameManager.Instancia.allCoinsCollected)
             {
-                estaReiniciando = true;
-                Debug.Log("[StartPoint] Objetivo concluído! Reiniciando a sala...");
-                ReiniciarSala();
-            }
-            else
-            {
-                int faltam = GameManager.Instancia != null ? GameManager.Instancia.moedasRestantes : 0;
-                Debug.Log($"[StartPoint] Você ainda precisa coletar {faltam} moedas.");
+                // Impede que o jogador fique quicando e ative o round várias vezes
+                aguardandoSaidaDoJogador = true; 
+                
+                Debug.Log("[StartPoint] Voltando à base com sucesso. Iniciando próximo round...");
+                GameManager.Instancia.AvancarRound();
             }
         }
     }
 
-    private void ReiniciarSala()
+    void OnTriggerExit(Collider other)
     {
-        Scene cenaAtual = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(cenaAtual.name);
+        // Assim que o jogador der o primeiro passo para fora da base no início do round, a base fica "armada" para receber ele de volta
+        if (other.CompareTag("Player"))
+        {
+            aguardandoSaidaDoJogador = false;
+        }
     }
 }
