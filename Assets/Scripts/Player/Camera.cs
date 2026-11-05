@@ -12,15 +12,18 @@ public class Camera : MonoBehaviour
 
     void Start()
     {
-        if (jogador != null)
-        {
-            offset = transform.position - jogador.position;
-        }
+        // Tenta achar o jogador automaticamente se estiver vazio
+        EncontrarJogador();
     }
 
     void LateUpdate()
     {
-        if (jogador == null) return;
+        // Se o jogador foi destruído (fim de round anterior), tenta achar o novo clone recém-criado
+        if (jogador == null)
+        {
+            EncontrarJogador();
+            return; // Pula este frame para evitar erro de cálculo de posição
+        }
 
         Vector3 posicaoAlvo = jogador.position + offset;
 
@@ -31,6 +34,20 @@ public class Camera : MonoBehaviour
         else
         {
             transform.position = posicaoAlvo;
+        }
+    }
+
+    private void EncontrarJogador()
+    {
+        GameObject objPlayer = GameObject.FindGameObjectWithTag("Player");
+        if (objPlayer != null)
+        {
+            jogador = objPlayer.transform;
+            
+            if (offset == Vector3.zero)
+            {
+                offset = transform.position - jogador.position;
+            }
         }
     }
 }

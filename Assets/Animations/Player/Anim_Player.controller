@@ -12,7 +12,7 @@ BlendTree:
     m_Motion: {fileID: -4791504522942941401, guid: 45e27afdb96841a4db10513864339df5, type: 3}
     m_Threshold: 0
     m_Position: {x: 0, y: 0}
-    m_TimeScale: 0.5
+    m_TimeScale: 1
     m_CycleOffset: 0
     m_DirectBlendParameter: Velocidade
     m_Mirror: 0
@@ -78,7 +78,7 @@ AnimatorStateMachine:
   m_ChildStates:
   - serializedVersion: 1
     m_State: {fileID: 6323918802490530518}
-    m_Position: {x: 280, y: 140, z: 0}
+    m_Position: {x: 270, y: 120, z: 0}
   m_ChildStateMachines: []
   m_AnyStateTransitions: []
   m_EntryTransitions: []

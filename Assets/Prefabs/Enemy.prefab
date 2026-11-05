@@ -190,16 +190,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2e6cbae339bf7f4ea82ee1185c27f9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IAInimigoHibrida
-  jogador: {fileID: 6140648496846690907, guid: 12a994de4df9f874b8c37c9dbbc4ab5d, type: 3}
+  jogador: {fileID: 524646911293155844, guid: c2a344e4e9aa2de468c52c74da893ed0, type: 3}
   agente: {fileID: 2855824779604270595}
-  pontosPatrulha:
-  - {fileID: 5195031524265426959, guid: f1059717885a2ab458e9d727e2b54378, type: 3}
-  - {fileID: 2189666657442557216, guid: 48e87a8ca9c572c45990201518d04cd9, type: 3}
-  - {fileID: 3121706752969881591, guid: 738230914c9c9d04cb53a711161f32eb, type: 3}
-  - {fileID: 1328494149891000904, guid: 52272c291263e55499d3bc65b57ce597, type: 3}
+  raioDeBusca: 15
+  tempoMinEspera: 1
+  tempoMaxEspera: 3.5
   raioVisao: 5
   raioPerdaDeVisao: 10
   raioAliados: 5
   quantidadeParaUnir: 2
   estadoAtual: 
   taticaAtual: 
+  mostrarRaiosDeVisao: 1

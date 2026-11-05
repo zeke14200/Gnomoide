@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.AI; // OBRIGATÓRIO PARA USAR O NAVMESH
+using UnityEngine.AI;
 using System.Collections.Generic;
 
 public class GameManager : MonoBehaviour
@@ -10,10 +10,12 @@ public class GameManager : MonoBehaviour
     public int roundAtual = 1;
 
     [Header("Configurações de Spawn (NavMesh)")]
-    [Tooltip("Um Empty GameObject bem no meio do seu quarto/mapa")]
     public Transform centroDaSala;
-    [Tooltip("Até quantos metros a partir do centro as coisas podem nascer")]
     public float raioDeSpawn = 15f; 
+
+    [Header("Configurações do Jogador")]
+    public GameObject prefabJogador; // ARRASTE O PREFAB DO PLAYER AQUI NO INSPECTOR
+    [HideInInspector] public GameObject jogadorNaCena;
 
     [Header("Configurações de Moedas")]
     public int moedasIniciais = 5;
@@ -28,9 +30,8 @@ public class GameManager : MonoBehaviour
 
     [Header("Referências da Sala")]
     public Transform pontoSpawnJogador;
-    private GameObject jogador;
 
-    [Header("Status do Round Atual (Somente Leitura)")]
+    [Header("Status do Round Atual")]
     public int totalMoedasRound;
     public int moedasColetadasRound;
     public bool allCoinsCollected;
@@ -41,30 +42,42 @@ public class GameManager : MonoBehaviour
 
     public int moedasRestantes => totalMoedasRound - moedasColetadasRound;
 
-    // Listas para limpar o cenário antes de começar o próximo round
     private List<GameObject> moedasAtivas = new List<GameObject>();
     private List<GameObject> inimigosAtivos = new List<GameObject>();
 
     void Awake()
     {
-        if (Instancia == null)
-        {
-            Instancia = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        if (Instancia == null) Instancia = this;
+        else Destroy(gameObject);
     }
 
     void Start()
     {
-        jogador = GameObject.FindGameObjectWithTag("Player");
-        
-        // Carrega o banco global de moedas e o round atual
         moedasAcumuladasTotais = PlayerPrefs.GetInt("MoedasAcumuladasTotais", 0);
         roundAtual = PlayerPrefs.GetInt("RoundAtual", 1); 
 
+        IniciarRound();
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F5))
+        {
+            ResetarProgresso();
+        }
+    }
+
+    public void ResetarProgresso()
+    {
+        Debug.LogWarning("!!! RESETANDO PROGRESSO DA PARTIDA !!!");
+        
+        roundAtual = 1;
+        moedasAcumuladasTotais = 0;
+        
+        PlayerPrefs.SetInt("RoundAtual", 1);
+        PlayerPrefs.SetInt("MoedasAcumuladasTotais", 0);
+        PlayerPrefs.Save();
+        
         IniciarRound();
     }
 
@@ -72,7 +85,6 @@ public class GameManager : MonoBehaviour
     {
         LimparSala();
 
-        // 1. Cálculos de Matemática da Progressão
         totalMoedasRound = moedasIniciais + ((roundAtual - 1) * moedasAdicionaisPorRound);
         inimigosNoRound = inimigosIniciais + ((roundAtual - 1) * inimigosAdicionaisPorRound);
         if (inimigosNoRound > limiteMaximoInimigos) inimigosNoRound = limiteMaximoInimigos;
@@ -80,27 +92,28 @@ public class GameManager : MonoBehaviour
         moedasColetadasRound = 0;
         allCoinsCollected = (totalMoedasRound == 0);
 
-        // 2. Teleporta o Jogador para o Início
-        if (jogador != null && pontoSpawnJogador != null)
+        // 1. DESTRÓI O JOGADOR VELHO (SE HOUVER) E INSTANCIA UM NOVO NO STARTPOINT
+        if (jogadorNaCena != null)
         {
-            CharacterController cc = jogador.GetComponent<CharacterController>();
-            if (cc != null) cc.enabled = false;
-            
-            jogador.transform.position = pontoSpawnJogador.position;
-            jogador.transform.rotation = pontoSpawnJogador.rotation;
-            
-            if (cc != null) cc.enabled = true;
+            Destroy(jogadorNaCena);
         }
 
-        // 3. Geração Procedural via NavMesh
+        if (prefabJogador != null && pontoSpawnJogador != null)
+        {
+            jogadorNaCena = Instantiate(prefabJogador, pontoSpawnJogador.position, pontoSpawnJogador.rotation);
+        }
+        else
+        {
+            Debug.LogError("Falta atribuir o Prefab do Jogador ou o Ponto de Spawn no GameManager!");
+        }
+
+        // 2. GERA MOEDAS E INIMIGOS, PASSANDO O NOVO JOGADOR COMO ALVO DA IA
         GerarObjetosNoNavMesh(totalMoedasRound, prefabMoeda, moedasAtivas);
-        GerarObjetosNoNavMesh(inimigosNoRound, prefabInimigo, inimigosAtivos);
+        GerarInimigosNoNavMesh(inimigosNoRound);
 
         Debug.Log($"--- ROUND {roundAtual} INICIADO ---");
-        Debug.Log($"Moedas: {totalMoedasRound} | Inimigos: {inimigosNoRound}");
     }
 
-    // A Mágica do NavMesh acontece aqui
     private void GerarObjetosNoNavMesh(int quantidade, GameObject prefab, List<GameObject> listaRegistro)
     {
         if (prefab == null || centroDaSala == null) return;
@@ -108,62 +121,63 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < quantidade; i++)
         {
             Vector3 pontoAleatorio = PegarPontoValidoNoNavMesh();
-            
-            // Instancia o objeto no ponto exato caminhável que o NavMesh validou
             GameObject novoObjeto = Instantiate(prefab, pontoAleatorio, Quaternion.identity);
             listaRegistro.Add(novoObjeto);
         }
     }
 
-    private Vector3 PegarPontoValidoNoNavMesh()
+    private void GerarInimigosNoNavMesh(int quantidade)
     {
-        // O script tenta achar um ponto válido até 30 vezes. Se não achar (o que é raríssimo), nasce no centro.
-        for (int tentativa = 0; tentativa < 30; tentativa++)
+        if (prefabInimigo == null || centroDaSala == null) return;
+
+        for (int i = 0; i < quantidade; i++)
         {
-            // Cria um ponto 100% aleatório dentro de uma esfera invisível
-            Vector3 pontoSorteado = centroDaSala.position + Random.insideUnitSphere * raioDeSpawn;
-            
-            NavMeshHit hit;
-            // O SamplePosition checa se num raio de 2 metros desse ponto aleatório existe chão do NavMesh.
-            if (NavMesh.SamplePosition(pontoSorteado, out hit, 2f, NavMesh.AllAreas))
+            Vector3 pontoAleatorio = PegarPontoValidoNoNavMesh();
+            GameObject novoInimigo = Instantiate(prefabInimigo, pontoAleatorio, Quaternion.identity);
+            inimigosAtivos.Add(novoInimigo);
+
+            // Injeta o alvo atualizado na IA do inimigo recém-criado
+            if (jogadorNaCena != null && novoInimigo.TryGetComponent<IAInimigoHibrida>(out var ia))
             {
-                return hit.position; // Retorna a posição exata, segura e livre de paredes
+                ia.jogador = jogadorNaCena.transform;
             }
         }
-        
-        Debug.LogWarning("Não foi possível achar um lugar no NavMesh! Spawnando no centro.");
+    }
+
+    private Vector3 PegarPontoValidoNoNavMesh()
+    {
+        for (int tentativa = 0; tentativa < 30; tentativa++)
+        {
+            Vector3 pontoSorteado = centroDaSala.position + Random.insideUnitSphere * raioDeSpawn;
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(pontoSorteado, out hit, 2f, NavMesh.AllAreas))
+            {
+                return hit.position; 
+            }
+        }
         return centroDaSala.position; 
     }
 
     private void LimparSala()
     {
-        foreach (GameObject obj in moedasAtivas)
-        {
-            if (obj != null) Destroy(obj);
-        }
+        foreach (GameObject obj in moedasAtivas) if (obj != null) Destroy(obj);
         moedasAtivas.Clear();
 
-        foreach (GameObject obj in inimigosAtivos)
-        {
-            if (obj != null) Destroy(obj);
-        }
+        foreach (GameObject obj in inimigosAtivos) if (obj != null) Destroy(obj);
         inimigosAtivos.Clear();
     }
 
     public void RegistrarColeta()
     {
         moedasColetadasRound++;
-        
         moedasAcumuladasTotais++;
         PlayerPrefs.SetInt("MoedasAcumuladasTotais", moedasAcumuladasTotais);
         PlayerPrefs.Save();
 
-        Debug.Log($"Moeda coletada! Faltam {moedasRestantes} no Round {roundAtual}. Total: {moedasAcumuladasTotais}");
-
         if (moedasColetadasRound >= totalMoedasRound)
         {
             allCoinsCollected = true;
-            Debug.Log("Todas as moedas do round pegas! Corra para o Spawn!");
+            Debug.Log("Todas as moedas pegas! Volte ao Spawn!");
         }
     }
 
@@ -172,17 +186,6 @@ public class GameManager : MonoBehaviour
         roundAtual++;
         PlayerPrefs.SetInt("RoundAtual", roundAtual);
         PlayerPrefs.Save();
-        
         IniciarRound();
-    }
-    
-    // Mostra a área de spawn na janela Scene (bolha amarela) para facilitar o ajuste do Raio
-    void OnDrawGizmosSelected()
-    {
-        if (centroDaSala != null)
-        {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(centroDaSala.position, raioDeSpawn);
-        }
     }
 }

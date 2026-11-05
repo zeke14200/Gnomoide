@@ -41,8 +41,13 @@ public class PlayerMovement : MonoBehaviour
     void Awake()
     {
         controller = GetComponent<CharacterController>();
-        animator = GetComponentInChildren<Animator>();
-
+        animator = GetComponentInChildren<Animator>(true);        
+        
+        if (animator != null)
+        {
+            animator.SetFloat("Velocidade", currentSpeed);
+        }
+    
         moveAction = new InputAction("Move");
         moveAction.AddCompositeBinding("Dpad")
             .With("Up", "<Keyboard>/w")
@@ -170,8 +175,7 @@ public class PlayerMovement : MonoBehaviour
         
         if (animator != null)
         {
-            animator.SetFloat("Velocidade", currentSpeed);
-        }
+            animator.SetFloat("Velocidade", currentSpeed);        }
     }
 
     void OnControllerColliderHit(ControllerColliderHit hit)

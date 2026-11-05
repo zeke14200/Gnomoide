@@ -6,11 +6,15 @@ using B4TGames.AI.BehaviourTree;
 public class IAInimigoHibrida : MonoBehaviour
 {
     [Header("Referências")]
-    public Transform jogador;
+    public Transform jogador; 
     public NavMeshAgent agente;
-    public Transform[] pontosPatrulha;
 
-    [Header("Configurações")]
+    [Header("Configurações de Patrulha (NavMesh)")]
+    public float raioDeBusca = 15f;
+    public float tempoMinEspera = 1f;
+    public float tempoMaxEspera = 3.5f;
+
+    [Header("Configurações de Visão e Grupo")]
     public float raioVisao = 10f;
     public float raioPerdaDeVisao = 15f;
     public float raioAliados = 5f;
@@ -20,32 +24,59 @@ public class IAInimigoHibrida : MonoBehaviour
     public int AliadosProximos { get; private set; }
     public bool EhLider { get; private set; }
     
-    [Header("Debug Visual (Monitor da IA)")]
     public string estadoAtual = "";
     public string taticaAtual = "";
+
+    [Header("Debug Visual")]
+    public bool mostrarRaiosDeVisao = true;
 
     private FSM fsm;
     private BTNode arvorePatrulha;
     private BTNode arvorePerseguicao;
     private BTNode arvorePerseguicaoUnida;
 
-    private int indicePatrulha = 0;
+    // Buffer otimizado para ler outros inimigos na cena sem travar o jogo
     private Collider[] bufferAliados = new Collider[10];
-
-    // Referência crucial ao Stealth do jogador
     private PlayerHiding estadoStealth;
+
+    private bool esperando = false;
+    private float cronometroEspera = 0f;
 
     void Start()
     {
         if (agente == null) agente = GetComponent<NavMeshAgent>();
-        if (jogador != null) estadoStealth = jogador.GetComponent<PlayerHiding>();
+
+        agente.enabled = true;
+        agente.isStopped = false;
+        agente.Warp(transform.position);
+
+        if (jogador == null)
+        {
+            GameObject objJogador = GameObject.FindGameObjectWithTag("Player");
+            if (objJogador != null)
+            {
+                jogador = objJogador.transform;
+            }
+        }
+
+        if (jogador != null)
+        {
+            estadoStealth = jogador.GetComponent<PlayerHiding>();
+        }
 
         ConstruirArvoresDeComportamento();
         ConstruirMaquinaDeEstados();
+        BuscarNovoPontoAleatorio();
     }
 
     void Update()
     {
+        // Se por acaso o player nasceu depois, garante que pega o componente de stealth
+        if (estadoStealth == null && jogador != null)
+        {
+            estadoStealth = jogador.GetComponent<PlayerHiding>();
+        }
+
         AtualizarRadarDeAliados(); 
         fsm?.Tick();
     }
@@ -55,7 +86,7 @@ public class IAInimigoHibrida : MonoBehaviour
         if (estadoAtual != novoEstado)
         {
             estadoAtual = novoEstado;
-            Debug.Log($"<color=cyan><b>[FSM]</b></color> {gameObject.name} mudou para o Estado: <b>{estadoAtual}</b>");
+            Debug.Log($"<color=cyan><b>[FSM]</b></color> {gameObject.name}: <b>{estadoAtual}</b>");
         }
     }
 
@@ -64,118 +95,158 @@ public class IAInimigoHibrida : MonoBehaviour
         if (taticaAtual != novaTatica)
         {
             taticaAtual = novaTatica;
-            Debug.Log($"<color=orange><b>[BT]</b></color> {gameObject.name} mudou para a Tática: <b>{taticaAtual}</b>");
         }
     }
 
     private void ConstruirArvoresDeComportamento()
     {
-        arvorePatrulha = new BTAction("AndarPelosPontos", () =>
+        arvorePatrulha = new BTAction("VasculharArea", () =>
         {
-            if (pontosPatrulha.Length == 0) return BTStatus.Failure;
-
             agente.speed = 2f;
             agente.stoppingDistance = 0f;
+            agente.isStopped = false;
 
-            if (agente.remainingDistance < 0.5f && !agente.pathPending)
+            if (esperando)
             {
-                indicePatrulha = (indicePatrulha + 1) % pontosPatrulha.Length;
+                cronometroEspera -= Time.deltaTime;
+                if (cronometroEspera <= 0f)
+                {
+                    esperando = false;
+                    BuscarNovoPontoAleatorio();
+                }
+                return BTStatus.Running;
             }
-            agente.SetDestination(pontosPatrulha[indicePatrulha].position);
+
+            if (!agente.pathPending)
+            {
+                bool chegou = agente.remainingDistance <= 0.5f;
+                bool caminhoInvalido = agente.pathStatus == NavMeshPathStatus.PathInvalid || agente.pathStatus == NavMeshPathStatus.PathPartial;
+                bool travadoEmParede = agente.velocity.sqrMagnitude < 0.1f && agente.remainingDistance > 0.5f;
+
+                if (chegou || caminhoInvalido || travadoEmParede)
+                {
+                    esperando = true;
+                    cronometroEspera = Random.Range(tempoMinEspera, tempoMaxEspera);
+                }
+            }
             
             return BTStatus.Running;
         });
 
         arvorePerseguicao = new BTAction("CorrerAtrasDoJogador", () =>
         {
+            if (jogador == null) return BTStatus.Failure;
+
             agente.speed = 5f;
             agente.stoppingDistance = 1.5f;
-            agente.SetDestination(jogador.position);
+            agente.isStopped = false;
+
+            if (Vector3.Distance(agente.destination, jogador.position) > 1f)
+            {
+                NavMeshHit hit;
+                if (NavMesh.SamplePosition(jogador.position, out hit, 3f, NavMesh.AllAreas))
+                {
+                    agente.SetDestination(hit.position);
+                }
+                else
+                {
+                    agente.SetDestination(jogador.position);
+                }
+            }
+            
             return BTStatus.Running;
         });
 
+        // =========================================================================
+        // AGORA AS TÁTICAS MISTAS E FRENÉTICAS ESTÃO ATIVAS QUANDO HÁ ALIADOS SUFICIENTES
+        // =========================================================================
         arvorePerseguicaoUnida = new BTSelector("TaticasDeGrupo",
             new BTSequence("TaticaFrenetica",
-                new BTCondition("MuitosAliados", () => AliadosProximos >= 6),
+                new BTCondition("MuitosAliados", () => AliadosProximos >= 4),
                 new BTAction("EsmagarJogador", () =>
                 {
-                    LogTatica("Frenética (Enxame)");
-                    agente.speed = 8f;
+                    if (jogador == null) return BTStatus.Failure;
+                    LogTatica("Frenética (Enxame Total)");
+                    agente.speed = 7f;
                     agente.stoppingDistance = 0f;
+                    agente.isStopped = false;
                     agente.SetDestination(jogador.position);
                     return BTStatus.Running;
                 })
             ),
             new BTSequence("TaticaMista",
-                new BTCondition("AliadosMedianos", () => AliadosProximos >= 3),
+                new BTCondition("AliadosMedianos", () => AliadosProximos >= 2),
                 new BTAction("AtaqueMistoTriplo", () =>
                 {
+                    if (jogador == null) return BTStatus.Failure;
                     int papel = Mathf.Abs(gameObject.GetInstanceID()) % 3;
 
+                    agente.isStopped = false;
                     if (papel == 0)
                     {
-                        LogTatica("Mista (Agressor - Ataca direto)");
+                        LogTatica("Mista (Agressor Direto)");
                         agente.speed = 5.5f;
                         agente.stoppingDistance = 1f;
                         agente.SetDestination(jogador.position);
                     }
                     else if (papel == 1)
                     {
-                        LogTatica("Mista (Interceptador - Vai pela frente)");
-                        agente.speed = 4.5f;
+                        LogTatica("Mista (Interceptador de Flanco)");
+                        agente.speed = 5f;
                         agente.stoppingDistance = 2f;
-                        Vector3 pontoFrente = jogador.position + (jogador.forward * 4f);
+                        Vector3 pontoFrente = jogador.position + (jogador.forward * 3f);
                         agente.SetDestination(pontoFrente);
                     }
                     else
                     {
-                        LogTatica("Mista (Bloqueador - Cobre as costas)");
-                        agente.speed = 4f;
-                        agente.stoppingDistance = 2.5f;
-                        Vector3 pontoCostas = jogador.position - (jogador.forward * 4f);
+                        LogTatica("Mista (Bloqueador de Retaguarda)");
+                        agente.speed = 4.5f;
+                        agente.stoppingDistance = 2f;
+                        Vector3 pontoCostas = jogador.position - (jogador.forward * 3f);
                         agente.SetDestination(pontoCostas);
                     }
                     return BTStatus.Running;
                 })
             ),
-            new BTAction("TaticaEmboscada", () =>
+            new BTAction("TaticaPadraoGrupo", () =>
             {
-                float distanciaAtual = Vector3.Distance(transform.position, jogador.position);
-
-                if (distanciaAtual < 3.5f)
-                {
-                    LogTatica("Emboscada (Defesa Corpo-a-Corpo)");
-                    agente.speed = 5f;
-                    agente.stoppingDistance = 1.5f;
-                    agente.SetDestination(jogador.position);
-                }
-                else
-                {
-                    LogTatica("Emboscada (Recuo de Cerco)");
-                    agente.speed = 4f;
-                    agente.stoppingDistance = 3f;
-                    Vector3 direcaoAfastamento = (transform.position - jogador.position).normalized;
-                    agente.SetDestination(jogador.position + (direcaoAfastamento * 3f));
-                }
+                if (jogador == null) return BTStatus.Failure;
+                LogTatica("Grupo (Apoio Mútuo)");
+                agente.speed = 5f;
+                agente.stoppingDistance = 1.5f;
+                agente.isStopped = false;
+                agente.SetDestination(jogador.position);
                 return BTStatus.Running;
             })
         );
     }
 
+    private void BuscarNovoPontoAleatorio()
+    {
+        Vector3 direcaoAleatoria = Random.insideUnitSphere * raioDeBusca;
+        direcaoAleatoria += transform.position;
+
+        NavMeshHit hit;
+        if (NavMesh.SamplePosition(direcaoAleatoria, out hit, raioDeBusca, NavMesh.AllAreas))
+        {
+            agente.SetDestination(hit.position);
+        }
+    }
+
     private void ConstruirMaquinaDeEstados()
     {
-        var estadoPatrulha = new FSMDelegateState("Estado_Patrulha",
-            onEnter: () => { LogEstado("Patrulha"); LogTatica("Nenhuma (Aguardando)"); },
+        var estadoPatrulha = new FSMDelegateState("Patrulha",
+            onEnter: () => { LogEstado("Vasculhando"); esperando = false; },
             onUpdate: () => arvorePatrulha.Tick()
         );
 
-        var estadoPerseguicao = new FSMDelegateState("Estado_Perseguicao",
-            onEnter: () => { LogEstado("Perseguição (Sozinho)"); LogTatica("Correndo atrás"); },
+        var estadoPerseguicao = new FSMDelegateState("Perseguicao",
+            onEnter: () => { LogEstado("Caçando (Sozinho)"); esperando = false; },
             onUpdate: () => arvorePerseguicao.Tick()
         );
 
-        var estadoPerseguicaoUnida = new FSMDelegateState("Estado_PerseguicaoUnida",
-            onEnter: () => { LogEstado("Perseguição Unida (Grupo)"); },
+        var estadoPerseguicaoUnida = new FSMDelegateState("PerseguicaoGrupo",
+            onEnter: () => { LogEstado("Caçando (Grupo com Táticas)"); esperando = false; },
             onUpdate: () => arvorePerseguicaoUnida.Tick()
         );
 
@@ -195,24 +266,33 @@ public class IAInimigoHibrida : MonoBehaviour
 
     private bool VeJogador()
     {
+        if (jogador == null) return false;
+
+        // CORREÇÃO DE STEALTH: Se o jogador entrou no armário, os inimigos perdem a visão dele instantaneamente
         if (estadoStealth != null && estadoStealth.isHidden) return false;
+
         return (transform.position - jogador.position).sqrMagnitude <= (raioVisao * raioVisao);
     }
 
     private bool PerdeuJogador()
     {
+        if (jogador == null) return true;
+
+        // CORREÇÃO DE STEALTH: Se escondeu, a IA desiste na mesma hora e volta a patrulhar
         if (estadoStealth != null && estadoStealth.isHidden) return true;
+
         return (transform.position - jogador.position).sqrMagnitude > (raioPerdaDeVisao * raioPerdaDeVisao);
     }
 
     private void AtualizarRadarDeAliados()
     {
+        // CONTAGEN ATIVA DE ALIADOS NA CENA PARA ATIVAR AS TÁTICAS DE GRUPO
         int hits = Physics.OverlapSphereNonAlloc(transform.position, raioAliados, bufferAliados);
         
         int contagem = 0;
         for (int i = 0; i < hits; i++)
         {
-            if (bufferAliados[i].CompareTag("Inimigo") && bufferAliados[i].gameObject != this.gameObject)
+            if (bufferAliados[i] != null && bufferAliados[i].CompareTag("Inimigo") && bufferAliados[i].gameObject != this.gameObject)
             {
                 contagem++;
             }
@@ -222,7 +302,7 @@ public class IAInimigoHibrida : MonoBehaviour
         EhLider = true; 
         for (int i = 0; i < hits; i++)
         {
-            if (bufferAliados[i].CompareTag("Inimigo") && bufferAliados[i].gameObject != this.gameObject)
+            if (bufferAliados[i] != null && bufferAliados[i].CompareTag("Inimigo") && bufferAliados[i].gameObject != this.gameObject)
             {
                 if (bufferAliados[i].TryGetComponent<IAInimigoHibrida>(out var outro))
                 {
@@ -239,9 +319,18 @@ public class IAInimigoHibrida : MonoBehaviour
 
     void OnDrawGizmos()
     {
+        if (mostrarRaiosDeVisao)
+        {
+            Gizmos.color = new Color(1f, 0f, 0f, 0.3f);
+            Gizmos.DrawWireSphere(transform.position, raioVisao);
+            
+            Gizmos.color = new Color(1f, 1f, 0f, 0.3f);
+            Gizmos.DrawWireSphere(transform.position, raioPerdaDeVisao);
+        }
+
         if (EhLider)
         {
-            Gizmos.color = Color.yellow;
+            Gizmos.color = Color.magenta;
             Gizmos.DrawWireSphere(transform.position + Vector3.up * 2.5f, 0.5f);
         }
     }
