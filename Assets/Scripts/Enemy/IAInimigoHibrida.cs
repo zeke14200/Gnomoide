@@ -334,4 +334,19 @@ public class IAInimigoHibrida : MonoBehaviour
             Gizmos.DrawWireSphere(transform.position + Vector3.up * 2.5f, 0.5f);
         }
     }
+    private void OnCollisionEnter(Collision collision)
+    {
+        // Só tenta empurrar móveis se estiver em Perseguição em Grupo com Tatica Frenética
+        if (estadoAtual == "PerseguicaoGrupo" && taticaAtual == "Frenética (Enxame Total)")
+        {
+            if (collision.gameObject.TryGetComponent<FurniturePhysics>(out var movel))
+            {
+                // Verifica se o móvel está na frente da IA
+                Vector3 dirImpacto = (collision.transform.position - transform.position).normalized;
+                
+                // Força de empurrão alta (pode ajustar)
+                movel.IA_ForceReleasePhysics(dirImpacto, 20f, collision.contacts[0].point);
+            }
+        }
+    }
 }

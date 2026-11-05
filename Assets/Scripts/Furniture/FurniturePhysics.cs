@@ -1,25 +1,33 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 [RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(NavMeshObstacle))] // Adicionado para forçar a existência
 public class FurniturePhysics : MonoBehaviour
 {
     [Header("Configurações de Interação")]
     [Tooltip("Se desmarcado, o objeto nunca será derrubado (ex: paredes ou armários pesados).")]
     public bool canBeKnockedOver = true;
 
-    [Tooltip("Velocidade mínima do jogador (impactForce) necessária para liberar a física.")]
+    [Tooltip("Velocidade mínima do jogador ou inimigo (impactForce) necessária para liberar a física.")]
     public float resistanceThreshold = 14f;
 
     [Tooltip("Multiplicador da força bruta aplicada ao objeto no momento do impacto.")]
     public float impactMultiplier = 2f;
 
     private Rigidbody rb;
+    private NavMeshObstacle obstaculoNavMesh;
     private bool isPhysicsReleased = false;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        obstaculoNavMesh = GetComponent<NavMeshObstacle>();
         
+        // Configura o obstáculo no início
+        obstaculoNavMesh.carving = true; 
+        obstaculoNavMesh.carveOnlyStationary = true; 
+
         LockPhysics();
     }
 
@@ -39,6 +47,18 @@ public class FurniturePhysics : MonoBehaviour
 
         if (impactForce < resistanceThreshold) return;
 
+        ReleasePhysics(impactDirection, impactForce, hitPoint);
+    }
+
+    // Método isolado para os inimigos ativarem sem checar as mesmas travas (isSpecialMove/threshold)
+    public void IA_ForceReleasePhysics(Vector3 impactDirection, float impactForce, Vector3 hitPoint)
+    {
+        if (!canBeKnockedOver || isPhysicsReleased) return;
+        ReleasePhysics(impactDirection, impactForce, hitPoint);
+    }
+
+    private void ReleasePhysics(Vector3 impactDirection, float impactForce, Vector3 hitPoint)
+    {
         rb.constraints = RigidbodyConstraints.None;
         isPhysicsReleased = true;
 
