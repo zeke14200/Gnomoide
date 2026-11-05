@@ -2274,6 +2274,9 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   suavizarMovimento: 1
   velocidadeSuavizacao: 5
+  usarLimites: 1
+  limiteX: {x: -100, y: 100}
+  limiteZ: {x: -6, y: 100}
 --- !u!1 &1456954124
 GameObject:
   m_ObjectHideFlags: 0

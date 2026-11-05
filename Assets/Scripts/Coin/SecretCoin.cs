@@ -34,20 +34,31 @@ public class SecretCoin : MonoBehaviour
         renderizador = GetComponentInChildren<Renderer>();
         posicaoInicial = transform.position;
 
-        GameObject objJogador = GameObject.FindGameObjectWithTag("Player");
-        if (objJogador != null) jogador = objJogador.transform;
-
         propBlock = new MaterialPropertyBlock();
         if (renderizador != null)
         {
             renderizador.GetPropertyBlock(propBlock);
             DefinirAlpha(0f); 
         }
+        
+        // Removemos a busca por Tag daqui para evitar conflito com o clone antigo sendo destruído
     }
 
     void Update()
     {
-        if (coletada || jogador == null) return;
+        if (coletada) return;
+
+        // RECUPERAÇÃO DINÂMICA: Se o jogador estiver nulo, busca o jogador oficial do round atual no GameManager
+        if (jogador == null)
+        {
+            if (GameManager.Instancia != null && GameManager.Instancia.jogadorNaCena != null)
+            {
+                jogador = GameManager.Instancia.jogadorNaCena.transform;
+            }
+            
+            // Se ainda assim estiver nulo (ex: transição de tela), aborta o frame atual
+            if (jogador == null) return; 
+        }
 
         if (!revelada)
         {
