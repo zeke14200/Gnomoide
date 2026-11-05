@@ -25,6 +25,7 @@ public class PlayerMovement : MonoBehaviour
     private InputAction crouchAction;
 
     private CharacterController controller;
+    private Animator animator;
     private Vector3 velocity;
     private Vector3 airMomentum;
     private bool isGrounded;
@@ -40,6 +41,7 @@ public class PlayerMovement : MonoBehaviour
     void Awake()
     {
         controller = GetComponent<CharacterController>();
+        animator = GetComponentInChildren<Animator>();
 
         moveAction = new InputAction("Move");
         moveAction.AddCompositeBinding("Dpad")
@@ -165,6 +167,11 @@ public class PlayerMovement : MonoBehaviour
         velocity.y += currentGravity * Time.deltaTime;
         
         controller.Move(velocity * Time.deltaTime);
+        
+        if (animator != null)
+        {
+            animator.SetFloat("Velocidade", currentSpeed);
+        }
     }
 
     void OnControllerColliderHit(ControllerColliderHit hit)
