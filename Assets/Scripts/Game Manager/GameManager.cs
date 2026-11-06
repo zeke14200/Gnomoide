@@ -14,7 +14,7 @@ public class GameManager : MonoBehaviour
     public float raioDeSpawn = 15f; 
 
     [Header("Configurações do Jogador")]
-    public GameObject prefabJogador; // ARRASTE O PREFAB DO PLAYER AQUI NO INSPECTOR
+    public GameObject prefabJogador; 
     [HideInInspector] public GameObject jogadorNaCena;
 
     [Header("Configurações de Moedas")]
@@ -53,8 +53,8 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        moedasAcumuladasTotais = PlayerPrefs.GetInt("MoedasAcumuladasTotais", 0);
-        roundAtual = PlayerPrefs.GetInt("RoundAtual", 1); 
+        moedasAcumuladasTotais = PlayerPrefs.GetInt("Moedas Acumuladas Totais", 0);
+        roundAtual = PlayerPrefs.GetInt("Round Atual", 1); 
 
         IniciarRound();
     }
@@ -69,8 +69,6 @@ public class GameManager : MonoBehaviour
 
     public void ResetarProgresso()
     {
-        Debug.LogWarning("!!! RESETANDO PROGRESSO DA PARTIDA !!!");
-        
         roundAtual = 1;
         moedasAcumuladasTotais = 0;
         
@@ -92,7 +90,6 @@ public class GameManager : MonoBehaviour
         moedasColetadasRound = 0;
         allCoinsCollected = (totalMoedasRound == 0);
 
-        // 1. DESTRÓI O JOGADOR VELHO (SE HOUVER) E INSTANCIA UM NOVO NO STARTPOINT
         if (jogadorNaCena != null)
         {
             Destroy(jogadorNaCena);
@@ -102,12 +99,7 @@ public class GameManager : MonoBehaviour
         {
             jogadorNaCena = Instantiate(prefabJogador, pontoSpawnJogador.position, pontoSpawnJogador.rotation);
         }
-        else
-        {
-            Debug.LogError("Falta atribuir o Prefab do Jogador ou o Ponto de Spawn no GameManager!");
-        }
 
-        // 2. GERA MOEDAS E INIMIGOS, PASSANDO O NOVO JOGADOR COMO ALVO DA IA
         GerarObjetosNoNavMesh(totalMoedasRound, prefabMoeda, moedasAtivas);
         GerarInimigosNoNavMesh(inimigosNoRound);
 
@@ -136,7 +128,6 @@ public class GameManager : MonoBehaviour
             GameObject novoInimigo = Instantiate(prefabInimigo, pontoAleatorio, Quaternion.identity);
             inimigosAtivos.Add(novoInimigo);
 
-            // Injeta o alvo atualizado na IA do inimigo recém-criado
             if (jogadorNaCena != null && novoInimigo.TryGetComponent<IAInimigoHibrida>(out var ia))
             {
                 ia.jogador = jogadorNaCena.transform;
@@ -177,7 +168,7 @@ public class GameManager : MonoBehaviour
         if (moedasColetadasRound >= totalMoedasRound)
         {
             allCoinsCollected = true;
-            Debug.Log("Todas as moedas pegas! Volte ao Spawn!");
+            Debug.Log("Todas as moedas pegas");
         }
     }
 

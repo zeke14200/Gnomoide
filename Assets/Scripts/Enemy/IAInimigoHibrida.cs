@@ -35,7 +35,6 @@ public class IAInimigoHibrida : MonoBehaviour
     private BTNode arvorePerseguicao;
     private BTNode arvorePerseguicaoUnida;
 
-    // Buffer otimizado para ler outros inimigos na cena sem travar o jogo
     private Collider[] bufferAliados = new Collider[10];
     private PlayerHiding estadoStealth;
 
@@ -71,7 +70,6 @@ public class IAInimigoHibrida : MonoBehaviour
 
     void Update()
     {
-        // Se por acaso o player nasceu depois, garante que pega o componente de stealth
         if (estadoStealth == null && jogador != null)
         {
             estadoStealth = jogador.GetComponent<PlayerHiding>();
@@ -156,10 +154,7 @@ public class IAInimigoHibrida : MonoBehaviour
             
             return BTStatus.Running;
         });
-
-        // =========================================================================
-        // AGORA AS TÁTICAS MISTAS E FRENÉTICAS ESTÃO ATIVAS QUANDO HÁ ALIADOS SUFICIENTES
-        // =========================================================================
+        
         arvorePerseguicaoUnida = new BTSelector("TaticasDeGrupo",
             new BTSequence("TaticaFrenetica",
                 new BTCondition("MuitosAliados", () => AliadosProximos >= 4),
@@ -268,7 +263,6 @@ public class IAInimigoHibrida : MonoBehaviour
     {
         if (jogador == null) return false;
 
-        // CORREÇÃO DE STEALTH: Se o jogador entrou no armário, os inimigos perdem a visão dele instantaneamente
         if (estadoStealth != null && estadoStealth.isHidden) return false;
 
         return (transform.position - jogador.position).sqrMagnitude <= (raioVisao * raioVisao);
@@ -278,7 +272,6 @@ public class IAInimigoHibrida : MonoBehaviour
     {
         if (jogador == null) return true;
 
-        // CORREÇÃO DE STEALTH: Se escondeu, a IA desiste na mesma hora e volta a patrulhar
         if (estadoStealth != null && estadoStealth.isHidden) return true;
 
         return (transform.position - jogador.position).sqrMagnitude > (raioPerdaDeVisao * raioPerdaDeVisao);
@@ -286,7 +279,6 @@ public class IAInimigoHibrida : MonoBehaviour
 
     private void AtualizarRadarDeAliados()
     {
-        // CONTAGEN ATIVA DE ALIADOS NA CENA PARA ATIVAR AS TÁTICAS DE GRUPO
         int hits = Physics.OverlapSphereNonAlloc(transform.position, raioAliados, bufferAliados);
         
         int contagem = 0;
@@ -336,15 +328,12 @@ public class IAInimigoHibrida : MonoBehaviour
     }
     private void OnCollisionEnter(Collision collision)
     {
-        // Só tenta empurrar móveis se estiver em Perseguição em Grupo com Tatica Frenética
         if (estadoAtual == "PerseguicaoGrupo" && taticaAtual == "Frenética (Enxame Total)")
         {
             if (collision.gameObject.TryGetComponent<FurniturePhysics>(out var movel))
             {
-                // Verifica se o móvel está na frente da IA
                 Vector3 dirImpacto = (collision.transform.position - transform.position).normalized;
                 
-                // Força de empurrão alta (pode ajustar)
                 movel.IA_ForceReleasePhysics(dirImpacto, 20f, collision.contacts[0].point);
             }
         }

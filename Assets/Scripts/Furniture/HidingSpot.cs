@@ -23,7 +23,6 @@ public class HidingSpot : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
 
-        // Encontra o Trigger (A zona de detecção gordinha que DEVE ter 'Is Trigger' marcado no Inspector)
         Collider[] todosMeusColliders = GetComponents<Collider>();
         foreach (Collider col in todosMeusColliders)
         {
@@ -34,7 +33,6 @@ public class HidingSpot : MonoBehaviour
             }
         }
 
-        // Encontra a parede de concreto (o BoxCollider que NÃO é Trigger)
         if (colisoresSolidos == null || colisoresSolidos.Length == 0)
         {
             List<Collider> solidos = new List<Collider>();
@@ -50,7 +48,6 @@ public class HidingSpot : MonoBehaviour
     {
         if (!permiteEsconderijo || !EstaEstavel()) return;
 
-        // Ignora colisores que sejam apenas Triggers (ex: radares da IA)
         if (other.isTrigger) return;
 
         if (other.CompareTag("Player"))
@@ -59,7 +56,6 @@ public class HidingSpot : MonoBehaviour
 
             PlayerMovement pm = other.GetComponent<PlayerMovement>();
             
-            // A entrada EXIGE o Shift
             if (pm != null && pm.isCrouching)
             {
                 jogadorEstaDentro = true;
@@ -67,7 +63,6 @@ public class HidingSpot : MonoBehaviour
                 transformJogador = other.transform;
                 scriptHidingDoJogador = other.GetComponent<PlayerHiding>();
 
-                // MÁGICA DA INTANGIBILIDADE ABSOLUTA: Desliga a parede e congela a gravidade!
                 TornarIntangivel(true);
                 
                 if (scriptHidingDoJogador != null && !scriptHidingDoJogador.isHidden)
@@ -85,7 +80,6 @@ public class HidingSpot : MonoBehaviour
             Vector3 bordaDoMovel = triggerDetecao.ClosestPoint(transformJogador.position);
             float distanciaParaFora = Vector3.Distance(transformJogador.position, bordaDoMovel);
 
-            // O esconderijo SÓ É CANCELADO quando o jogador estiver totalmente fora da bolha do móvel
             if (distanciaParaFora > margemDeSaida)
             {
                 SairDoEsconderijo();
@@ -102,7 +96,6 @@ public class HidingSpot : MonoBehaviour
             scriptHidingDoJogador.SairEsconderijo();
         }
         
-        // Devolve a parede e a gravidade
         TornarIntangivel(false);
 
         transformJogador = null;
@@ -111,10 +104,8 @@ public class HidingSpot : MonoBehaviour
 
     private void TornarIntangivel(bool intangivel)
     {
-        // 1. Congela o móvel no ar. Ele não vai cair no void porque está imune à gravidade.
         if (rb != null) rb.isKinematic = intangivel;
 
-        // 2. Desliga a parede física completamente. É IMPOSSÍVEL o CharacterController bater nela agora.
         for (int i = 0; i < colisoresSolidos.Length; i++)
         {
             if (colisoresSolidos[i] != null)

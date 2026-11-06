@@ -32,7 +32,6 @@ public class PlayerMovement : MonoBehaviour
 
     private float currentSpeed; 
     
-    // Variável pública para o HidingSpot saber que o Shift está sendo pressionado
     public bool isCrouching { get; private set; }
     
     private bool isLongJumping;
@@ -180,7 +179,6 @@ public class PlayerMovement : MonoBehaviour
 
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
-        // Sistema de Física de Derrubar Móveis (Preservado)
         FurniturePhysics furniture = hit.collider.GetComponent<FurniturePhysics>();
         if (furniture != null)
         {

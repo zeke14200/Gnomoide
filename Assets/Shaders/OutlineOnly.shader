@@ -7,7 +7,6 @@ Shader "Custom/OutlineOnly"
     }
     SubShader
     {
-        // 1. Mudamos a fila (Queue) para Overlay, garantindo que ele seja desenhado por último
         Tags { "RenderType"="Transparent" "RenderPipeline"="UniversalPipeline" "Queue"="Overlay" }
 
         Pass
@@ -15,9 +14,7 @@ Shader "Custom/OutlineOnly"
             Name "Outline"
             
             Cull Front
-            // 2. Desliga a escrita de profundidade para não bugar outras sombras
             ZWrite Off      
-            // 3. A MÁGICA: Ignora a profundidade. Fica sempre visível por cima de tudo!
             ZTest Always    
 
             HLSLPROGRAM

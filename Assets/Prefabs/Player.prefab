@@ -100,7 +100,7 @@ MonoBehaviour:
   deceleration: 20
   rotationSpeed: 720
   jumpHeight: 2
-  gravity: -20
+  gravity: -10
   crouchSpeed: 3
   longJumpHeight: 1.2
   longJumpForwardSpeed: 15

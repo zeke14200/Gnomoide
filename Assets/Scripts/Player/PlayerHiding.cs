@@ -4,7 +4,7 @@ using UnityEngine;
 public class PlayerHiding : MonoBehaviour
 {
     [Header("Configurações Visuais")]
-    [Tooltip("Material que usa o shader Custom/OutlineOnly")]
+    [Tooltip("Material Outline")]
     public Material materialOutline;
 
     public bool isHidden { get; private set; }
@@ -35,8 +35,6 @@ public class PlayerHiding : MonoBehaviour
             }
             rend.materials = matsOutline;
         }
-
-        Debug.Log("Jogador entrou na zona de stealth do móvel.");
     }
 
     public void SairEsconderijo()
@@ -51,7 +49,5 @@ public class PlayerHiding : MonoBehaviour
                 rend.materials = materiaisOriginais[rend];
             }
         }
-
-        Debug.Log("Jogador saiu completamente do móvel. Visibilidade restaurada.");
     }
 }

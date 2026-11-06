@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(Rigidbody))]
-[RequireComponent(typeof(NavMeshObstacle))] // Adicionado para forçar a existência
+[RequireComponent(typeof(NavMeshObstacle))] 
 public class FurniturePhysics : MonoBehaviour
 {
     [Header("Configurações de Interação")]
@@ -24,7 +24,6 @@ public class FurniturePhysics : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         obstaculoNavMesh = GetComponent<NavMeshObstacle>();
         
-        // Configura o obstáculo no início
         obstaculoNavMesh.carving = true; 
         obstaculoNavMesh.carveOnlyStationary = true; 
 
@@ -50,7 +49,6 @@ public class FurniturePhysics : MonoBehaviour
         ReleasePhysics(impactDirection, impactForce, hitPoint);
     }
 
-    // Método isolado para os inimigos ativarem sem checar as mesmas travas (isSpecialMove/threshold)
     public void IA_ForceReleasePhysics(Vector3 impactDirection, float impactForce, Vector3 hitPoint)
     {
         if (!canBeKnockedOver || isPhysicsReleased) return;
