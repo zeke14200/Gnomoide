@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using B4TGames.AI.StateMachine;
@@ -13,6 +14,9 @@ public class IAInimigoHibrida : MonoBehaviour
     public float raioDeBusca = 15f;
     public float tempoMinEspera = 1f;
     public float tempoMaxEspera = 3.5f;
+    [Range(0f, 1f)]
+    [Tooltip("Chance de sortear outra sala da lista em vez de seguir a ordem sequencial.")]
+    public float chanceSalaAleatoria = 0.45f;
 
     [Header("Configurações de Visão e Grupo")]
     public float raioVisao = 10f;
@@ -37,6 +41,9 @@ public class IAInimigoHibrida : MonoBehaviour
 
     private Collider[] bufferAliados = new Collider[10];
     private PlayerHiding estadoStealth;
+
+    private readonly List<Vector3> pontosDePatrulhaSalas = new List<Vector3>();
+    private int indicePatrulhaAtual = -1;
 
     private bool esperando = false;
     private float cronometroEspera = 0f;
@@ -79,6 +86,30 @@ public class IAInimigoHibrida : MonoBehaviour
         fsm?.Tick();
     }
 
+    /// <summary>
+    /// Recebe os centros das salas geradas no round para usar na patrulha.
+    /// </summary>
+    public void DefinirPontosDePatrulha(List<Vector3> novosPontos)
+    {
+        pontosDePatrulhaSalas.Clear();
+        if (novosPontos != null)
+        {
+            for (int i = 0; i < novosPontos.Count; i++)
+            {
+                pontosDePatrulhaSalas.Add(novosPontos[i]);
+            }
+        }
+
+        indicePatrulhaAtual = -1;
+        esperando = false;
+        cronometroEspera = 0f;
+
+        if (agente != null && agente.isActiveAndEnabled && agente.isOnNavMesh)
+        {
+            BuscarNovoPontoAleatorio();
+        }
+    }
+
     private void LogEstado(string novoEstado)
     {
         if (estadoAtual != novoEstado)
@@ -117,9 +148,9 @@ public class IAInimigoHibrida : MonoBehaviour
 
             if (!agente.pathPending)
             {
-                bool chegou = agente.remainingDistance <= 0.5f;
+                bool chegou = agente.remainingDistance <= 0.65f;
                 bool caminhoInvalido = agente.pathStatus == NavMeshPathStatus.PathInvalid || agente.pathStatus == NavMeshPathStatus.PathPartial;
-                bool travadoEmParede = agente.velocity.sqrMagnitude < 0.1f && agente.remainingDistance > 0.5f;
+                bool travadoEmParede = agente.velocity.sqrMagnitude < 0.1f && agente.remainingDistance > 0.65f;
 
                 if (chegou || caminhoInvalido || travadoEmParede)
                 {
@@ -218,6 +249,34 @@ public class IAInimigoHibrida : MonoBehaviour
 
     private void BuscarNovoPontoAleatorio()
     {
+        if (agente == null || !agente.isActiveAndEnabled || !agente.isOnNavMesh) return;
+
+        // Prioriza a sequência/sorteio de centros de salas do mapa procedural
+        if (pontosDePatrulhaSalas.Count > 0)
+        {
+            int proximoIndice = (indicePatrulhaAtual + 1) % pontosDePatrulhaSalas.Count;
+
+            if (pontosDePatrulhaSalas.Count > 1 && Random.value < chanceSalaAleatoria)
+            {
+                int tentativa = Random.Range(0, pontosDePatrulhaSalas.Count);
+                if (tentativa != indicePatrulhaAtual)
+                {
+                    proximoIndice = tentativa;
+                }
+            }
+
+            indicePatrulhaAtual = proximoIndice;
+            Vector3 centroSala = pontosDePatrulhaSalas[indicePatrulhaAtual];
+
+            NavMeshHit hitSala;
+            if (NavMesh.SamplePosition(centroSala, out hitSala, 3.5f, NavMesh.AllAreas))
+            {
+                agente.SetDestination(hitSala.position);
+                return;
+            }
+        }
+
+        // Fallback caso a lista de salas ainda esteja vazia
         Vector3 direcaoAleatoria = Random.insideUnitSphere * raioDeBusca;
         direcaoAleatoria += transform.position;
 
@@ -326,6 +385,7 @@ public class IAInimigoHibrida : MonoBehaviour
             Gizmos.DrawWireSphere(transform.position + Vector3.up * 2.5f, 0.5f);
         }
     }
+
     private void OnCollisionEnter(Collision collision)
     {
         if (estadoAtual == "PerseguicaoGrupo" && taticaAtual == "Frenética (Enxame Total)")

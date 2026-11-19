@@ -82,6 +82,11 @@ public class GameManager : MonoBehaviour
     public void IniciarRound()
     {
         LimparSala();
+        
+        if (ProjetoGnomoide.Procedural.ProceduralMapGenerator.Instancia != null)
+        {
+            ProjetoGnomoide.Procedural.ProceduralMapGenerator.Instancia.GenerateMapForRound(roundAtual);
+        }
 
         totalMoedasRound = moedasIniciais + ((roundAtual - 1) * moedasAdicionaisPorRound);
         inimigosNoRound = inimigosIniciais + ((roundAtual - 1) * inimigosAdicionaisPorRound);
