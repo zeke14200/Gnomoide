@@ -174,7 +174,6 @@ namespace ProjetoGnomoide.Procedural
                 ExpansionTask task = queue.Dequeue();
                 if (task.socket == null) continue;
 
-                // Se já atingiu o limite de quartos do round, fecha as saídas restantes
                 if (remainingRooms <= 0 && remainingCorridors <= 0)
                 {
                     PlaceBlockerAtSocket(task.socket);
@@ -185,13 +184,11 @@ namespace ProjetoGnomoide.Procedural
                     ? markovChain.GetNextKind(task.parentKind, safeRound, remainingCorridors, task.depth, maxDepth)
                     : (remainingCorridors > 0 ? ChunkNodeKind.Corridor : ChunkNodeKind.ExplorationRoom);
 
-                // Se for corredor mas acabou o orçamento de corredores, vira quarto (se ainda houver quartos)
                 if (nextKind == ChunkNodeKind.Corridor && remainingCorridors <= 0)
                 {
                     nextKind = remainingRooms > 0 ? ChunkNodeKind.ExplorationRoom : ChunkNodeKind.DeadEnd;
                 }
 
-                // Se for quarto mas acabou o orçamento de quartos, fecha saída
                 if ((nextKind == ChunkNodeKind.ExplorationRoom || nextKind == ChunkNodeKind.DeadEnd) && remainingRooms <= 0)
                 {
                     if (remainingCorridors > 0)
@@ -232,6 +229,17 @@ namespace ProjetoGnomoide.Procedural
                 }
             }
 
+            // Cada PrefabChunk gera seus próprios móveis de centro e de parede (exceto SafeRoom)
+            for (int i = 0; i < activeChunks.Count; i++)
+            {
+                PrefabChunk chunk = activeChunks[i];
+                if (chunk != null && chunk.nodeKind != ChunkNodeKind.SafeRoom)
+                {
+                    chunk.SpawnChunkFurniture(mapContainer, spawnedFurniture);
+                }
+            }
+
+            // Se ainda usar MapContentSpawner apenas para extras/sem duplicar moedas:
             if (contentSpawner != null)
             {
                 contentSpawner.PopulateContent(
@@ -275,7 +283,8 @@ namespace ProjetoGnomoide.Procedural
 
             instance.GetWorldOverlapBox(out Vector3 center, out Vector3 halfExtents, out Quaternion orientation);
 
-            // 1. Impede que um chunk nasça no mesmo espaço ou sobreponha outro chunk já ativo
+            float newRadiusXZ = Mathf.Max(halfExtents.x, halfExtents.z) * 0.9f;
+
             for (int i = 0; i < activeChunks.Count; i++)
             {
                 PrefabChunk existing = activeChunks[i];
@@ -283,21 +292,22 @@ namespace ProjetoGnomoide.Procedural
 
                 existing.GetWorldOverlapBox(out Vector3 existingCenter, out Vector3 existingHalfExtents, out _);
 
-                float minDist = (Mathf.Min(existingHalfExtents.x, existingHalfExtents.z) + Mathf.Min(halfExtents.x, halfExtents.z)) * 0.85f;
+                float existingRadiusXZ = Mathf.Max(existingHalfExtents.x, existingHalfExtents.z) * 0.9f;
+                float minAllowedDist = (existingRadiusXZ + newRadiusXZ) * 0.85f;
+
                 float flatDist = Vector2.Distance(
                     new Vector2(existingCenter.x, existingCenter.z),
                     new Vector2(center.x, center.z)
                 );
 
-                if (flatDist < minDist)
+                if (flatDist < minAllowedDist)
                 {
                     Destroy(instance.gameObject);
                     return null;
                 }
             }
 
-            // 2. Checa colisão física com o ambiente já instanciado
-            Collider[] overlaps = Physics.OverlapBox(center, halfExtents * 0.85f, orientation, chunkOverlapMask, QueryTriggerInteraction.Ignore);
+            Collider[] overlaps = Physics.OverlapBox(center, halfExtents * 0.95f, orientation, chunkOverlapMask, QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < overlaps.Length; i++)
             {
@@ -320,7 +330,6 @@ namespace ProjetoGnomoide.Procedural
         {
             activeChunks.Add(chunk);
 
-            // Nunca adiciona SafeRoom na patrulha de inimigos
             if (chunk.nodeKind != ChunkNodeKind.SafeRoom && chunk.includeInEnemyPatrol)
             {
                 roomPatrolPoints.Add(chunk.PatrolWorldPosition);

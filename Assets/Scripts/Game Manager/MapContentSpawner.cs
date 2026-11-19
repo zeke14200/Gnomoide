@@ -4,225 +4,314 @@ using UnityEngine.AI;
 
 namespace ProjetoGnomoide.Procedural
 {
-    [System.Serializable]
-    public class CategoryFurnitureConfig
-    {
-        public FurnitureCategory category;
-        public WeightedRandomTable<GameObject> furnitureTable = new WeightedRandomTable<GameObject>();
-        [Range(0f, 1f)] public float spawnChancePerPoint = 0.7f;
-        [Min(0.1f)] public float minSpacingBetweenFurniture = 1.6f;
-    }
-
     public class MapContentSpawner : MonoBehaviour
     {
-        [Header("Configuração de Móveis por Categoria")]
-        [SerializeField] private List<CategoryFurnitureConfig> furnitureConfigs = new List<CategoryFurnitureConfig>();
-        [SerializeField] private LayerMask furnitureOverlapMask = ~0;
+        [System.Serializable]
+        public class FurnitureEntry
+        {
+            public GameObject prefab;
+            [Min(0.01f)] public float weight = 1f;
+            [Min(0.2f)] public float clearanceRadius = 0.9f;
+            [Tooltip("Distância de afastamento da face interna da parede (para móveis de parede).")]
+            [Min(0f)] public float wallOffset = 0.55f;
+        }
 
-        [Header("Configuração de Moedas")]
-        [Tooltip("Prefab da moeda (ex: Prefab com SecretCoin).")]
+        [Header("1. Móveis Obrigatórios no Centro")]
+        [SerializeField] private List<FurnitureEntry> centerFurniturePrefabs = new List<FurnitureEntry>();
+        [Min(0)] [SerializeField] private int minCenterFurniturePerRoom = 1;
+        [Min(0)] [SerializeField] private int maxCenterFurniturePerRoom = 1;
+
+        [Header("2. Móveis Exclusivos de Parede (Aleatória)")]
+        [SerializeField] private List<FurnitureEntry> wallFurniturePrefabs = new List<FurnitureEntry>();
+        [Min(0)] [SerializeField] private int minWallFurniturePerRoom = 1;
+        [Min(0)] [SerializeField] private int maxWallFurniturePerRoom = 3;
+        [Tooltip("Margem para não encostar nas quinas onde ficam as aberturas/sockets.")]
+        [Min(0.5f)] [SerializeField] private float wallCornerPadding = 2.2f;
+
+        [Header("Regras Gerais de Sala e Obstáculos")]
+        [SerializeField] private bool allowFurnitureInCorridors = false;
+        [SerializeField] private LayerMask obstacleMask = ~0;
+        [Min(5)] [SerializeField] private int attemptsPerItem = 25;
+        [Min(0.2f)] [SerializeField] private float navMeshSampleRadius = 2.0f;
+
+        [Header("Moedas (Spawn Dinâmico)")]
         [SerializeField] private GameObject coinPrefab;
-
-        [Min(0)] [SerializeField] private int minCoinsPerRoom = 1;
-        [Min(0)] [SerializeField] private int maxCoinsPerRoom = 3;
-
-        [Range(0f, 1f)]
-        [Tooltip("Chance base de um ponto de moeda ser selecionado durante a distribuição.")]
-        [SerializeField] private float coinPointChance = 0.65f;
-
-        [Tooltip("Distância mínima entre duas moedas geradas para evitar aglomeração.")]
-        [SerializeField] private float minDistanceBetweenCoins = 1.25f;
-
-        [Tooltip("Se verdadeiro, sincroniza totalMoedasRound no GameManager com a quantidade real gerada.")]
-        [SerializeField] private bool syncRoundCoinCountWithGameManager = true;
-
-        private readonly List<Vector3> placedFurniturePositions = new List<Vector3>();
-        private readonly List<Vector3> placedCoinPositions = new List<Vector3>();
+        [Min(0)] [SerializeField] private int coinsPerRoomRound1 = 2;
+        [Min(0)] [SerializeField] private int extraCoinsPerRound = 1;
+        [Min(0.1f)] [SerializeField] private float coinClearanceRadius = 0.55f;
 
         public void PopulateContent(
-            List<PrefabChunk> generatedChunks,
-            Transform contentParent,
-            List<GameObject> spawnedFurnitureRegistry,
-            List<GameObject> spawnedCoinsRegistry,
+            IReadOnlyList<PrefabChunk> activeChunks,
+            Transform parentContainer,
+            List<GameObject> spawnedFurniture,
+            List<GameObject> spawnedCoins,
             int currentRound)
         {
-            placedFurniturePositions.Clear();
-            placedCoinPositions.Clear();
+            if (activeChunks == null || activeChunks.Count == 0) return;
 
-            if (generatedChunks == null || generatedChunks.Count == 0) return;
+            int coinsTargetPerRoom = Mathf.Max(0, coinsPerRoomRound1 + ((Mathf.Max(1, currentRound) - 1) * extraCoinsPerRound));
 
-            // 1. Móveis por chunk e categoria
-            for (int i = 0; i < generatedChunks.Count; i++)
+            for (int i = 0; i < activeChunks.Count; i++)
             {
-                PrefabChunk chunk = generatedChunks[i];
-                if (chunk == null) continue;
+                PrefabChunk chunk = activeChunks[i];
+                if (chunk == null || chunk.nodeKind == ChunkNodeKind.SafeRoom) continue;
 
-                SpawnFurnitureForChunk(chunk, contentParent, spawnedFurnitureRegistry);
+                bool isRoom = chunk.nodeKind == ChunkNodeKind.ExplorationRoom || chunk.nodeKind == ChunkNodeKind.DeadEnd;
+                bool canSpawnFurniture = isRoom || (allowFurnitureInCorridors && chunk.nodeKind == ChunkNodeKind.Corridor);
+
+                if (canSpawnFurniture)
+                {
+                    SpawnCenterFurnitureInChunk(chunk, parentContainer, spawnedFurniture);
+                    SpawnWallFurnitureInChunk(chunk, parentContainer, spawnedFurniture);
+                }
+
+                if (isRoom && coinPrefab != null && coinsTargetPerRoom > 0)
+                {
+                    for (int c = 0; c < coinsTargetPerRoom; c++)
+                    {
+                        if (TryFindFreePointInChunk(chunk, coinClearanceRadius, 0.72f, out Vector3 coinPos))
+                        {
+                            coinPos.y += 0.35f;
+                            GameObject coin = Instantiate(coinPrefab, coinPos, Quaternion.identity, parentContainer);
+                            spawnedCoins.Add(coin);
+                        }
+                    }
+                }
             }
-
-            // 2. Moedas distribuídas entre as salas de forma equilibrada
-            SpawnCoinsAcrossChunks(generatedChunks, contentParent, spawnedCoinsRegistry, currentRound);
         }
 
-        private void SpawnFurnitureForChunk(
+        private void SpawnCenterFurnitureInChunk(PrefabChunk chunk, Transform parentContainer, List<GameObject> spawnedFurniture)
+        {
+            if (centerFurniturePrefabs == null || centerFurniturePrefabs.Count == 0) return;
+
+            int count = Random.Range(minCenterFurniturePerRoom, maxCenterFurniturePerRoom + 1);
+            for (int i = 0; i < count; i++)
+            {
+                FurnitureEntry chosen = PickWeighted(centerFurniturePrefabs);
+                if (chosen == null || chosen.prefab == null) continue;
+
+                chunk.GetWorldOverlapBox(out Vector3 center, out _, out Quaternion rot);
+                Vector3 centerPos = new Vector3(center.x, chunk.transform.position.y, center.z);
+
+                if (NavMesh.SamplePosition(centerPos, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas))
+                {
+                    centerPos = hit.position;
+                }
+
+                // Se houver leve obstrução no centro exato, tenta um pequeno deslocamento ao redor do centro
+                if (IsBlocked(centerPos, chosen.clearanceRadius))
+                {
+                    bool foundNearby = false;
+                    for (int a = 0; a < attemptsPerItem; a++)
+                    {
+                        Vector2 offset2D = Random.insideUnitCircle * 1.4f;
+                        Vector3 candidate = centerPos + (rot * new Vector3(offset2D.x, 0f, offset2D.y));
+                        if (NavMesh.SamplePosition(candidate, out NavMeshHit altHit, navMeshSampleRadius, NavMesh.AllAreas))
+                        {
+                            candidate = altHit.position;
+                        }
+
+                        if (!IsBlocked(candidate, chosen.clearanceRadius))
+                        {
+                            centerPos = candidate;
+                            foundNearby = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundNearby) continue;
+                }
+
+                Quaternion yawRot = rot * Quaternion.Euler(0f, Random.Range(0, 4) * 90f, 0f);
+                GameObject obj = Instantiate(chosen.prefab, centerPos, yawRot, parentContainer);
+                spawnedFurniture.Add(obj);
+            }
+        }
+
+        private void SpawnWallFurnitureInChunk(PrefabChunk chunk, Transform parentContainer, List<GameObject> spawnedFurniture)
+        {
+            if (wallFurniturePrefabs == null || wallFurniturePrefabs.Count == 0) return;
+
+            int count = Random.Range(minWallFurniturePerRoom, maxWallFurniturePerRoom + 1);
+            if (count <= 0) return;
+
+            // Sorteia uma parede inicial aleatória (0: +Z, 1: -Z, 2: +X, 3: -X)
+            int primaryWallSide = Random.Range(0, 4);
+
+            for (int i = 0; i < count; i++)
+            {
+                FurnitureEntry chosen = PickWeighted(wallFurniturePrefabs);
+                if (chosen == null || chosen.prefab == null) continue;
+
+                // Prioriza a parede aleatória sorteada; se não couber ali, testa as outras paredes
+                int wallSide = (primaryWallSide + i) % 4;
+                if (TryFindWallPointInChunk(chunk, wallSide, chosen, out Vector3 wallPos, out Quaternion wallRot))
+                {
+                    GameObject obj = Instantiate(chosen.prefab, wallPos, wallRot, parentContainer);
+                    spawnedFurniture.Add(obj);
+                }
+            }
+        }
+
+        private bool TryFindWallPointInChunk(
             PrefabChunk chunk,
-            Transform contentParent,
-            List<GameObject> registry)
+            int wallSide,
+            FurnitureEntry entry,
+            out Vector3 worldPos,
+            out Quaternion worldRot)
         {
-            for (int c = 0; c < furnitureConfigs.Count; c++)
+            worldPos = Vector3.zero;
+            worldRot = Quaternion.identity;
+
+            chunk.GetWorldOverlapBox(out Vector3 center, out Vector3 halfExtents, out Quaternion rot);
+
+            float maxSpanX = Mathf.Max(0.4f, halfExtents.x - wallCornerPadding);
+            float maxSpanZ = Mathf.Max(0.4f, halfExtents.z - wallCornerPadding);
+
+            for (int attempt = 0; attempt < attemptsPerItem; attempt++)
             {
-                CategoryFurnitureConfig cfg = furnitureConfigs[c];
-                if (!cfg.furnitureTable.HasValidEntries()) continue;
+                Vector3 localCandidate = Vector3.zero;
+                // Rotação local olhando para o interior da sala (-Z se estiver na parede +Z, etc.)
+                Quaternion localFacingRot = Quaternion.identity;
 
-                List<Transform> points = chunk.GetPointsForCategory(cfg.category);
-                if (points == null || points.Count == 0) continue;
-
-                int maxAllowed = chunk.GetMaxItemsForCategory(cfg.category);
-                if (maxAllowed <= 0) maxAllowed = points.Count;
-
-                List<Transform> shuffledPoints = new List<Transform>(points);
-                ShuffleList(shuffledPoints);
-
-                int spawnedCount = 0;
-                for (int p = 0; p < shuffledPoints.Count; p++)
+                switch (wallSide)
                 {
-                    if (spawnedCount >= maxAllowed) break;
+                    case 0: // Parede +Z (frente)
+                        localCandidate = new Vector3(
+                            Random.Range(-maxSpanX, maxSpanX),
+                            0f,
+                            Mathf.Max(0.4f, halfExtents.z - entry.wallOffset)
+                        );
+                        localFacingRot = Quaternion.Euler(0f, 180f, 0f);
+                        break;
 
-                    Transform pt = shuffledPoints[p];
-                    if (pt == null) continue;
+                    case 1: // Parede -Z (trás)
+                        localCandidate = new Vector3(
+                            Random.Range(-maxSpanX, maxSpanX),
+                            0f,
+                            -Mathf.Max(0.4f, halfExtents.z - entry.wallOffset)
+                        );
+                        localFacingRot = Quaternion.Euler(0f, 0f, 0f);
+                        break;
 
-                    if (Random.value > cfg.spawnChancePerPoint) continue;
+                    case 2: // Parede +X (direita)
+                        localCandidate = new Vector3(
+                            Mathf.Max(0.4f, halfExtents.x - entry.wallOffset),
+                            0f,
+                            Random.Range(-maxSpanZ, maxSpanZ)
+                        );
+                        localFacingRot = Quaternion.Euler(0f, -90f, 0f);
+                        break;
 
-                    if (IsTooCloseToExisting(pt.position, placedFurniturePositions, cfg.minSpacingBetweenFurniture))
-                        continue;
-
-                    if (Physics.CheckSphere(pt.position + Vector3.up * 0.4f, cfg.minSpacingBetweenFurniture * 0.45f, furnitureOverlapMask, QueryTriggerInteraction.Ignore))
-                        continue;
-
-                    GameObject prefab = cfg.furnitureTable.Roll();
-                    if (prefab == null) continue;
-
-                    Vector3 spawnPos = SnapToNavMeshOrPoint(pt.position, 1.5f);
-                    GameObject instance = Instantiate(prefab, spawnPos, pt.rotation, contentParent);
-
-                    EnsureNavMeshObstacle(instance);
-
-                    placedFurniturePositions.Add(spawnPos);
-                    registry.Add(instance);
-                    spawnedCount++;
+                    case 3: // Parede -X (esquerda)
+                    default:
+                        localCandidate = new Vector3(
+                            -Mathf.Max(0.4f, halfExtents.x - entry.wallOffset),
+                            0f,
+                            Random.Range(-maxSpanZ, maxSpanZ)
+                        );
+                        localFacingRot = Quaternion.Euler(0f, 90f, 0f);
+                        break;
                 }
-            }
-        }
 
-        private void SpawnCoinsAcrossChunks(
-            List<PrefabChunk> chunks,
-            Transform contentParent,
-            List<GameObject> coinRegistry,
-            int currentRound)
-        {
-            if (coinPrefab == null) return;
+                Vector3 candidate = center + (rot * localCandidate);
+                candidate.y = chunk.transform.position.y;
 
-            // Filtra chunks elegíveis para moedas (prioriza salas de exploração e becos sem saída, excluindo SafeRoom)
-            List<PrefabChunk> eligibleRooms = new List<PrefabChunk>();
-            for (int i = 0; i < chunks.Count; i++)
-            {
-                PrefabChunk ch = chunks[i];
-                if (ch == null || ch.nodeKind == ChunkNodeKind.SafeRoom) continue;
-                if (ch.coinSpawnPoints != null && ch.coinSpawnPoints.Count > 0)
+                if (ProceduralMapGenerator.Instancia != null &&
+                    ProceduralMapGenerator.Instancia.IsPositionInsideSafeRoom(candidate, 0.5f))
                 {
-                    eligibleRooms.Add(ch);
+                    continue;
                 }
-            }
 
-            if (eligibleRooms.Count == 0) return;
-
-            ShuffleList(eligibleRooms);
-
-            int totalSpawned = 0;
-            int effectiveMaxPerRoom = Mathf.Max(minCoinsPerRoom, maxCoinsPerRoom + ((currentRound - 1) / 3));
-
-            for (int r = 0; r < eligibleRooms.Count; r++)
-            {
-                PrefabChunk room = eligibleRooms[r];
-                List<Transform> candidatePoints = new List<Transform>(room.coinSpawnPoints);
-                ShuffleList(candidatePoints);
-
-                int targetForThisRoom = Random.Range(minCoinsPerRoom, effectiveMaxPerRoom + 1);
-                targetForThisRoom = Mathf.Clamp(targetForThisRoom, 0, candidatePoints.Count);
-
-                int roomCoinsSpawned = 0;
-
-                for (int p = 0; p < candidatePoints.Count; p++)
+                if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas))
                 {
-                    if (roomCoinsSpawned >= targetForThisRoom) break;
-
-                    Transform pt = candidatePoints[p];
-                    if (pt == null) continue;
-
-                    // Garante pelo menos minCoinsPerRoom se possível; nos extras aplica a chance
-                    if (roomCoinsSpawned >= minCoinsPerRoom && Random.value > coinPointChance)
-                        continue;
-
-                    if (IsTooCloseToExisting(pt.position, placedCoinPositions, minDistanceBetweenCoins))
-                        continue;
-
-                    if (IsTooCloseToExisting(pt.position, placedFurniturePositions, 0.7f))
-                        continue;
-
-                    Vector3 coinPos = SnapToNavMeshOrPoint(pt.position, 1.5f) + Vector3.up * 0.25f;
-                    GameObject coinObj = Instantiate(coinPrefab, coinPos, Quaternion.identity, contentParent);
-
-                    placedCoinPositions.Add(coinPos);
-                    coinRegistry.Add(coinObj);
-                    roomCoinsSpawned++;
-                    totalSpawned++;
+                    candidate = hit.position;
                 }
+
+                if (IsBlocked(candidate, entry.clearanceRadius))
+                {
+                    continue;
+                }
+
+                worldPos = candidate;
+                worldRot = rot * localFacingRot;
+                return true;
             }
 
-            if (syncRoundCoinCountWithGameManager && GameManager.Instancia != null && totalSpawned > 0)
-            {
-                GameManager.Instancia.totalMoedasRound = totalSpawned;
-                GameManager.Instancia.moedasColetadasRound = 0;
-                GameManager.Instancia.allCoinsCollected = false;
-            }
-        }
-
-        private void EnsureNavMeshObstacle(GameObject furniture)
-        {
-            if (furniture.TryGetComponent<NavMeshObstacle>(out var obstacle))
-            {
-                obstacle.carving = true;
-                obstacle.carveOnlyStationary = true;
-            }
-        }
-
-        private Vector3 SnapToNavMeshOrPoint(Vector3 origin, float maxDistance)
-        {
-            if (NavMesh.SamplePosition(origin, out NavMeshHit hit, maxDistance, NavMesh.AllAreas))
-            {
-                return hit.position;
-            }
-            return origin;
-        }
-
-        private bool IsTooCloseToExisting(Vector3 pos, List<Vector3> existing, float minDistance)
-        {
-            float minSqr = minDistance * minDistance;
-            for (int i = 0; i < existing.Count; i++)
-            {
-                if ((existing[i] - pos).sqrMagnitude < minSqr)
-                    return true;
-            }
             return false;
         }
 
-        private void ShuffleList<T>(List<T> list)
+        private bool TryFindFreePointInChunk(PrefabChunk chunk, float clearanceRadius, float innerFactor, out Vector3 result)
         {
-            for (int i = list.Count - 1; i > 0; i--)
+            result = Vector3.zero;
+            chunk.GetWorldOverlapBox(out Vector3 center, out Vector3 halfExtents, out Quaternion rot);
+
+            float usableHalfX = Mathf.Max(0.5f, halfExtents.x * innerFactor);
+            float usableHalfZ = Mathf.Max(0.5f, halfExtents.z * innerFactor);
+
+            for (int attempt = 0; attempt < attemptsPerItem; attempt++)
             {
-                int j = Random.Range(0, i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
+                Vector3 candidate = center + (rot * new Vector3(
+                    Random.Range(-usableHalfX, usableHalfX),
+                    0f,
+                    Random.Range(-usableHalfZ, usableHalfZ)
+                ));
+                candidate.y = chunk.transform.position.y;
+
+                if (ProceduralMapGenerator.Instancia != null &&
+                    ProceduralMapGenerator.Instancia.IsPositionInsideSafeRoom(candidate, 0.5f))
+                {
+                    continue;
+                }
+
+                if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, navMeshSampleRadius, NavMesh.AllAreas))
+                {
+                    candidate = hit.position;
+                }
+
+                if (IsBlocked(candidate, clearanceRadius))
+                {
+                    continue;
+                }
+
+                result = candidate;
+                return true;
             }
+
+            return false;
+        }
+
+        private bool IsBlocked(Vector3 worldPos, float clearanceRadius)
+        {
+            Vector3 checkPos = worldPos + Vector3.up * Mathf.Max(0.35f, clearanceRadius * 0.5f);
+            return Physics.CheckSphere(checkPos, clearanceRadius, obstacleMask, QueryTriggerInteraction.Ignore);
+        }
+
+        private FurnitureEntry PickWeighted(List<FurnitureEntry> list)
+        {
+            float total = 0f;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] != null && list[i].prefab != null && list[i].weight > 0f)
+                {
+                    total += list[i].weight;
+                }
+            }
+
+            if (total <= 0f) return null;
+
+            float roll = Random.Range(0f, total);
+            float cumulative = 0f;
+            for (int i = 0; i < list.Count; i++)
+            {
+                FurnitureEntry entry = list[i];
+                if (entry == null || entry.prefab == null || entry.weight <= 0f) continue;
+
+                cumulative += entry.weight;
+                if (roll <= cumulative) return entry;
+            }
+
+            return null;
         }
     }
 }

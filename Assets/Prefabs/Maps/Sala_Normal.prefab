@@ -116,13 +116,32 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProjetoGnomoide.Procedural.PrefabChunk
   nodeKind: 2
-  chunkId: Chunk_Padrao
+  chunkId: Exploration
   entrySocket: {fileID: 7119626661732956150}
   exitSockets: []
   patrolCenter: {fileID: 4925065338831773960}
   includeInEnemyPatrol: 1
-  furnitureSpawnGroups: []
-  coinSpawnPoints: []
+  centerFurnitureOptions:
+  - prefab: {fileID: 6316511884836369223, guid: 5554d218889a4984ea582d243595e2d0, type: 3}
+    weight: 1
+    clearanceRadius: 1
+    wallOffset: 0.5
+  minCenterItems: 1
+  maxCenterItems: 1
+  wallFurnitureOptions:
+  - prefab: {fileID: 6316511884836369223, guid: 5554d218889a4984ea582d243595e2d0, type: 3}
+    weight: 1
+    clearanceRadius: 1
+    wallOffset: 0.4
+  minWallItems: 3
+  maxWallItems: 5
+  wallCornerPadding: 2
+  spawnFurnitureInThisChunk: 1
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 247
+  maxAttemptsPerFurniture: 25
+  navMeshSampleRadius: 2
   boundsLocalCenter: {x: -0.05, y: 2.93, z: 0.21}
   boundsSize: {x: 12.3, y: 6.06, z: 13.3}
 --- !u!1 &3404211060102246330

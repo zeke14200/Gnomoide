@@ -897,6 +897,10 @@ PrefabInstance:
       value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
+      propertyPath: chunkId
+      value: Corredor
+      objectReference: {fileID: 0}
+    - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
       propertyPath: nodeKind
       value: 1
       objectReference: {fileID: 0}
@@ -915,6 +919,14 @@ PrefabInstance:
     - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
       propertyPath: boundsSize.z
       value: 24
+      objectReference: {fileID: 0}
+    - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
+      propertyPath: maxWallItems
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
+      propertyPath: minWallItems
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
       propertyPath: patrolCenter
@@ -952,6 +964,10 @@ PrefabInstance:
       propertyPath: 'exitSockets.Array.data[2]'
       value: 
       objectReference: {fileID: 2174523221869364346}
+    - target: {fileID: 6243970174797089616, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
+      propertyPath: wallFurnitureOptions.Array.size
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7363940517819039127, guid: d432ba0948cdc954c88f7ab8b8d524b1, type: 3}
       propertyPath: m_Enabled
       value: 1

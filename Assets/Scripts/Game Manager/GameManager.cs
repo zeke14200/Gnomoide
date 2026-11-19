@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
+using ProjetoGnomoide.Procedural;
 
 public class GameManager : MonoBehaviour
 {
@@ -11,10 +12,10 @@ public class GameManager : MonoBehaviour
 
     [Header("Configurações de Spawn (NavMesh)")]
     public Transform centroDaSala;
-    public float raioDeSpawn = 15f; 
+    public float raioDeSpawn = 15f;
 
     [Header("Configurações do Jogador")]
-    public GameObject prefabJogador; 
+    public GameObject prefabJogador;
     [HideInInspector] public GameObject jogadorNaCena;
 
     [Header("Configurações de Moedas")]
@@ -42,8 +43,8 @@ public class GameManager : MonoBehaviour
 
     public int moedasRestantes => totalMoedasRound - moedasColetadasRound;
 
-    private List<GameObject> moedasAtivas = new List<GameObject>();
-    private List<GameObject> inimigosAtivos = new List<GameObject>();
+    private readonly List<GameObject> moedasAtivas = new List<GameObject>();
+    private readonly List<GameObject> inimigosAtivos = new List<GameObject>();
 
     void Awake()
     {
@@ -54,7 +55,7 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         moedasAcumuladasTotais = PlayerPrefs.GetInt("Moedas Acumuladas Totais", 0);
-        roundAtual = PlayerPrefs.GetInt("Round Atual", 1); 
+        roundAtual = PlayerPrefs.GetInt("Round Atual", 1);
 
         IniciarRound();
     }
@@ -71,21 +72,21 @@ public class GameManager : MonoBehaviour
     {
         roundAtual = 1;
         moedasAcumuladasTotais = 0;
-        
-        PlayerPrefs.SetInt("RoundAtual", 1);
+
+        PlayerPrefs.SetInt("Round Atual", 1);
         PlayerPrefs.SetInt("MoedasAcumuladasTotais", 0);
         PlayerPrefs.Save();
-        
+
         IniciarRound();
     }
 
     public void IniciarRound()
     {
         LimparSala();
-        
-        if (ProjetoGnomoide.Procedural.ProceduralMapGenerator.Instancia != null)
+
+        if (ProceduralMapGenerator.Instancia != null)
         {
-            ProjetoGnomoide.Procedural.ProceduralMapGenerator.Instancia.GenerateMapForRound(roundAtual);
+            ProceduralMapGenerator.Instancia.GenerateMapForRound(roundAtual);
         }
 
         totalMoedasRound = moedasIniciais + ((roundAtual - 1) * moedasAdicionaisPorRound);
@@ -105,27 +106,79 @@ public class GameManager : MonoBehaviour
             jogadorNaCena = Instantiate(prefabJogador, pontoSpawnJogador.position, pontoSpawnJogador.rotation);
         }
 
-        GerarObjetosNoNavMesh(totalMoedasRound, prefabMoeda, moedasAtivas);
+        // Moedas são geradas exclusivamente aqui no GameManager
+        GerarMoedasNoMapa(totalMoedasRound);
+
+        // Inimigos são gerados exclusivamente aqui no GameManager
         GerarInimigosNoNavMesh(inimigosNoRound);
 
         Debug.Log($"--- ROUND {roundAtual} INICIADO ---");
     }
 
-    private void GerarObjetosNoNavMesh(int quantidade, GameObject prefab, List<GameObject> listaRegistro)
+    private void GerarMoedasNoMapa(int quantidade)
     {
-        if (prefab == null || centroDaSala == null) return;
+        if (prefabMoeda == null || quantidade <= 0) return;
+
+        List<PrefabChunk> chunksValidos = new List<PrefabChunk>();
+        if (ProceduralMapGenerator.Instancia != null)
+        {
+            var ativos = ProceduralMapGenerator.Instancia.ActiveChunks;
+            for (int i = 0; i < ativos.Count; i++)
+            {
+                if (ativos[i] != null && ativos[i].nodeKind != ChunkNodeKind.SafeRoom)
+                {
+                    chunksValidos.Add(ativos[i]);
+                }
+            }
+        }
 
         for (int i = 0; i < quantidade; i++)
         {
-            Vector3 pontoAleatorio = PegarPontoValidoNoNavMesh();
-            GameObject novoObjeto = Instantiate(prefab, pontoAleatorio, Quaternion.identity);
-            listaRegistro.Add(novoObjeto);
+            Vector3 ponto = Vector3.zero;
+            bool achou = false;
+
+            if (chunksValidos.Count > 0)
+            {
+                PrefabChunk chunkEscolhido = chunksValidos[Random.Range(0, chunksValidos.Count)];
+                chunkEscolhido.GetWorldOverlapBox(out Vector3 center, out Vector3 halfExtents, out Quaternion rot);
+
+                for (int t = 0; t < 20; t++)
+                {
+                    Vector3 candidato = center + (rot * new Vector3(
+                        Random.Range(-halfExtents.x * 0.7f, halfExtents.x * 0.7f),
+                        0f,
+                        Random.Range(-halfExtents.z * 0.7f, halfExtents.z * 0.7f)
+                    ));
+                    candidato.y = chunkEscolhido.transform.position.y + 0.35f;
+
+                    if (ProceduralMapGenerator.Instancia.IsPositionInsideSafeRoom(candidato, 0.5f)) continue;
+
+                    if (NavMesh.SamplePosition(candidato, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+                    {
+                        ponto = hit.position + Vector3.up * 0.35f;
+                        achou = true;
+                        break;
+                    }
+
+                    ponto = candidato;
+                    achou = true;
+                    break;
+                }
+            }
+
+            if (!achou)
+            {
+                ponto = PegarPontoValidoNoNavMesh() + Vector3.up * 0.35f;
+            }
+
+            GameObject moeda = Instantiate(prefabMoeda, ponto, Quaternion.identity);
+            moedasAtivas.Add(moeda);
         }
     }
-
+    
     private void GerarInimigosNoNavMesh(int quantidade)
     {
-        if (prefabInimigo == null || centroDaSala == null) return;
+        if (prefabInimigo == null || quantidade <= 0) return;
 
         for (int i = 0; i < quantidade; i++)
         {
@@ -142,16 +195,67 @@ public class GameManager : MonoBehaviour
 
     private Vector3 PegarPontoValidoNoNavMesh()
     {
-        for (int tentativa = 0; tentativa < 30; tentativa++)
+        List<PrefabChunk> chunksValidos = new List<PrefabChunk>();
+        if (ProceduralMapGenerator.Instancia != null)
         {
-            Vector3 pontoSorteado = centroDaSala.position + Random.insideUnitSphere * raioDeSpawn;
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(pontoSorteado, out hit, 2f, NavMesh.AllAreas))
+            var ativos = ProceduralMapGenerator.Instancia.ActiveChunks;
+            for (int i = 0; i < ativos.Count; i++)
             {
-                return hit.position; 
+                if (ativos[i] != null && ativos[i].nodeKind != ChunkNodeKind.SafeRoom)
+                {
+                    chunksValidos.Add(ativos[i]);
+                }
             }
         }
-        return centroDaSala.position; 
+
+        // 1. Prioriza os cômodos gerados fora da Safe Room
+        if (chunksValidos.Count > 0)
+        {
+            for (int tentativa = 0; tentativa < 30; tentativa++)
+            {
+                PrefabChunk chunkEscolhido = chunksValidos[Random.Range(0, chunksValidos.Count)];
+                chunkEscolhido.GetWorldOverlapBox(out Vector3 center, out Vector3 halfExtents, out Quaternion rot);
+
+                Vector3 candidato = center + (rot * new Vector3(
+                    Random.Range(-halfExtents.x * 0.65f, halfExtents.x * 0.65f),
+                    0f,
+                    Random.Range(-halfExtents.z * 0.65f, halfExtents.z * 0.65f)
+                ));
+                candidato.y = chunkEscolhido.transform.position.y;
+
+                if (ProceduralMapGenerator.Instancia.IsPositionInsideSafeRoom(candidato, 1.0f))
+                    continue;
+
+                if (NavMesh.SamplePosition(candidato, out NavMeshHit hit, 2.5f, NavMesh.AllAreas))
+                {
+                    if (!ProceduralMapGenerator.Instancia.IsPositionInsideSafeRoom(hit.position, 1.0f))
+                        return hit.position;
+                }
+                else
+                {
+                    // Se o NavMesh ainda não tiver sido assado nesse chunk, usa o ponto interno do cômodo
+                    return candidato;
+                }
+            }
+
+            // Fallback garantido em um dos cômodos válidos (nunca na Safe Room)
+            PrefabChunk fallbackChunk = chunksValidos[Random.Range(0, chunksValidos.Count)];
+            return fallbackChunk.PatrolWorldPosition;
+        }
+
+        // Caso extremo: se nenhum chunk extra foi gerado no round
+        Vector3 baseCenter = centroDaSala != null ? centroDaSala.position : transform.position;
+        for (int tentativa = 0; tentativa < 20; tentativa++)
+        {
+            Vector3 pontoSorteado = baseCenter + Random.insideUnitSphere * raioDeSpawn;
+            pontoSorteado.y = baseCenter.y;
+            if (NavMesh.SamplePosition(pontoSorteado, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+            {
+                return hit.position;
+            }
+        }
+
+        return baseCenter;
     }
 
     private void LimparSala()
@@ -167,7 +271,7 @@ public class GameManager : MonoBehaviour
     {
         moedasColetadasRound++;
         moedasAcumuladasTotais++;
-        PlayerPrefs.SetInt("MoedasAcumuladasTotais", moedasAcumuladasTotais);
+        PlayerPrefs.SetInt("Moedas Acumuladas Totais", moedasAcumuladasTotais);
         PlayerPrefs.Save();
 
         if (moedasColetadasRound >= totalMoedasRound)
@@ -180,7 +284,7 @@ public class GameManager : MonoBehaviour
     public void AvancarRound()
     {
         roundAtual++;
-        PlayerPrefs.SetInt("RoundAtual", roundAtual);
+        PlayerPrefs.SetInt("Round Atual", roundAtual);
         PlayerPrefs.Save();
         IniciarRound();
     }
