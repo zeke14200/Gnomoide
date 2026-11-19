@@ -123,8 +123,8 @@ MonoBehaviour:
   includeInEnemyPatrol: 1
   furnitureSpawnGroups: []
   coinSpawnPoints: []
-  boundsLocalCenter: {x: 0, y: 1.25, z: 0}
-  boundsSize: {x: 8.8, y: 2.33, z: 8.4}
+  boundsLocalCenter: {x: -0.05, y: 2.93, z: 0.21}
+  boundsSize: {x: 12.3, y: 6.06, z: 13.3}
 --- !u!1 &3404211060102246330
 GameObject:
   m_ObjectHideFlags: 0

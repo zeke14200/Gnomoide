@@ -263,7 +263,7 @@ namespace ProjetoGnomoide.Procedural
             }
         }
 
-private PrefabChunk TrySpawnChunkAtSocket(PrefabChunk prefab, Transform targetExitSocket, out bool success)
+        private PrefabChunk TrySpawnChunkAtSocket(PrefabChunk prefab, Transform targetExitSocket, out bool success)
         {
             success = false;
             if (prefab == null || targetExitSocket == null) return null;
@@ -275,9 +275,7 @@ private PrefabChunk TrySpawnChunkAtSocket(PrefabChunk prefab, Transform targetEx
 
             instance.GetWorldOverlapBox(out Vector3 center, out Vector3 halfExtents, out Quaternion orientation);
 
-            float newRadiusXZ = Mathf.Max(halfExtents.x, halfExtents.z) * 0.9f;
-
-            // 1. Impede que um chunk nasça sobre ou muito próximo do centro de outro chunk já ativo
+            // 1. Impede que um chunk nasça no mesmo espaço ou sobreponha outro chunk já ativo
             for (int i = 0; i < activeChunks.Count; i++)
             {
                 PrefabChunk existing = activeChunks[i];
@@ -285,15 +283,13 @@ private PrefabChunk TrySpawnChunkAtSocket(PrefabChunk prefab, Transform targetEx
 
                 existing.GetWorldOverlapBox(out Vector3 existingCenter, out Vector3 existingHalfExtents, out _);
 
-                float existingRadiusXZ = Mathf.Max(existingHalfExtents.x, existingHalfExtents.z) * 0.9f;
-                float minAllowedDist = (existingRadiusXZ + newRadiusXZ) * 0.85f;
-
+                float minDist = (Mathf.Min(existingHalfExtents.x, existingHalfExtents.z) + Mathf.Min(halfExtents.x, halfExtents.z)) * 0.85f;
                 float flatDist = Vector2.Distance(
                     new Vector2(existingCenter.x, existingCenter.z),
                     new Vector2(center.x, center.z)
                 );
 
-                if (flatDist < minAllowedDist)
+                if (flatDist < minDist)
                 {
                     Destroy(instance.gameObject);
                     return null;
@@ -301,7 +297,7 @@ private PrefabChunk TrySpawnChunkAtSocket(PrefabChunk prefab, Transform targetEx
             }
 
             // 2. Checa colisão física com o ambiente já instanciado
-            Collider[] overlaps = Physics.OverlapBox(center, halfExtents * 0.95f, orientation, chunkOverlapMask, QueryTriggerInteraction.Ignore);
+            Collider[] overlaps = Physics.OverlapBox(center, halfExtents * 0.85f, orientation, chunkOverlapMask, QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < overlaps.Length; i++)
             {
